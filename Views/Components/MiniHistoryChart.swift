@@ -1,0 +1,40 @@
+import SwiftUI
+import Charts
+
+struct MiniHistoryChart: View {
+    let data: [Double]
+    let gradient: Gradient
+    
+    struct HistoricalData: Identifiable {
+        let id = UUID()
+        let index: Int
+        let value: Double
+    }
+    
+    private var chartData: [HistoricalData] {
+        data.enumerated().map { (offset, element) in HistoricalData(index: offset, value: element) }
+    }
+    
+    var body: some View {
+        Chart(chartData) { item in
+            AreaMark(
+                x: .value("Time", item.index),
+                y: .value("Usage", item.value)
+            )
+            .foregroundStyle(LinearGradient(gradient: gradient, startPoint: .top, endPoint: .bottom).opacity(0.3))
+            .interpolationMethod(.catmullRom)
+            
+            LineMark(
+                x: .value("Time", item.index),
+                y: .value("Usage", item.value)
+            )
+            .foregroundStyle(LinearGradient(gradient: gradient, startPoint: .leading, endPoint: .trailing))
+            .interpolationMethod(.catmullRom)
+            .lineStyle(StrokeStyle(lineWidth: 2))
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartYScale(domain: 0...1)
+        .frame(height: 100)
+    }
+}
