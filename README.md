@@ -7,15 +7,14 @@ A premium, minimalist macOS system monitor featuring a stunning **Liquid Glass H
 ## Core Features
 
 - **Liquid Glass UI**: A beautiful, translucent HUD that floats on your desktop, providing a modern alternative to cluttered system monitors.
-- **Top 5 Resource Monitoring**: Real-time identification of the most resource-intensive processes for:
-  - **CPU**: Performance cores and load balancing.
-  - **Memory (RAM)**: Visual composition (Wired, Active, Compressed, Free).
-  - **GPU**: Graphics utilization metrics.
-  - **Disk**: SSD health and throughput.
-  - **Network**: Live upload and download tracking.
-  - **Battery**: Energy impact and health stats.
-- **Native Performance**: Uses low-level macOS kernel APIs (`libproc`) to fetch system data with minimal overhead.
-- **Menu Bar Integration**: Quick-glance metrics right in your system menu bar.
+- **Full Thermal Monitoring**: Real-time temperature readings for every critical component:
+  - **CPU & GPU**: Precise die temperatures for performance tracking.
+  - **SoC (Memory)**: Monitor the substrate temperature of the Apple Silicon chip.
+  - **SSD**: Real-time NVMe storage temperature.
+  - **Battery**: Thermal tracking for energy health.
+- **Top 5 Resource Monitoring**: Real-time identification of the most resource-intensive processes across all categories (CPU, RAM, GPU, Disk, Network).
+- **Enhanced Menu Bar**: Quick-glance metrics featuring both the **activity level** and the **component temperature** (e.g., `52° 34%`) right in your system menu bar.
+- **Native Performance**: Uses low-level macOS kernel APIs (`libproc`, `IOKit`, `SMC`) to fetch system data with minimal overhead.
 
 ## How to Use
 
@@ -25,9 +24,9 @@ A premium, minimalist macOS system monitor featuring a stunning **Liquid Glass H
 3. Launch the app from your Applications folder or via Spotlight.
 
 ### Navigation
-- **HUD Panel**: The main dashboard displays a live history chart and a list of the top 5 most active processes for the selected category.
-- **Switching Categories**: Click the icons at the top of the HUD to switch between CPU, GPU, Memory, etc.
-- **Menu Bar**: Click the iActivity icon in your menu bar to toggle the dashboard visibility.
+- **HUD Panel**: The main dashboard displays a live history chart, component-specific details (including real-time temperature), and a list of the top 5 most active processes.
+- **Switching Categories**: Click the icons at the top of the HUD to switch between CPU, GPU, Memory, etc. The menu bar will automatically update to reflect the selected category.
+- **Menu Bar**: Displays the icon, current temperature, and activity level for the selected category. Click the icon to toggle the dashboard visibility.
 
 ## Building from Source
 

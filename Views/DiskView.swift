@@ -20,12 +20,19 @@ struct DiskView: View {
                     value: formatBytes(monitor.disk.total),
                     color: AppTheme.Colors.accentColor(for: .disk)
                 )
-                
+
                 LiquidDetailCard(
                     icon: "folder",
                     label: "Available",
                     value: formatBytes(monitor.disk.free),
                     color: .green
+                )
+
+                LiquidDetailCard(
+                    icon: "thermometer.medium",
+                    label: "Temp",
+                    value: String(format: "%.1f°C", monitor.disk.temperature),
+                    color: .orange
                 )
             }
             

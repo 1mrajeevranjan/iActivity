@@ -8,9 +8,10 @@ class DiskMonitor {
     var free: Int64 = 0
     var used: Int64 = 0
     var usagePercentage: Double = 0
-    
+    var temperature: Double = 0
+
     private var timer: Timer?
-    
+
     func start() {
         stop()
         timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
@@ -20,16 +21,19 @@ class DiskMonitor {
         }
         update()
     }
-    
+
     func stop() {
         timer?.invalidate()
         timer = nil
     }
-    
+
     private func update() {
+        // Update SSD temperature
+        temperature = SMCHelper.diskTemperature()
+
         let fileManager = FileManager.default
         let path = "/"
-        
+
         do {
             let values = try fileManager.attributesOfFileSystem(forPath: path)
             if let totalSize = values[.systemSize] as? Int64,

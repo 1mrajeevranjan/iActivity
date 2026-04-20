@@ -21,12 +21,19 @@ struct MemoryView: View {
                         value: formatBytes(monitor.memory.total),
                         color: AppTheme.Colors.accentColor(for: .memory)
                     )
-                    
+
                     LiquidDetailCard(
                         icon: "arrow.up.circle",
                         label: "Used",
                         value: formatBytes(monitor.memory.used),
                         color: .red
+                    )
+
+                    LiquidDetailCard(
+                        icon: "thermometer.medium",
+                        label: "Temp",
+                        value: String(format: "%.1f°C", monitor.memory.temperature),
+                        color: .orange
                     )
                 }
             }

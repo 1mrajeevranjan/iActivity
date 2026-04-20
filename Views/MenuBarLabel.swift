@@ -3,13 +3,19 @@ import SwiftUI
 struct MenuBarLabel: View {
     let monitor: SystemMonitor
     @AppStorage("selectedCategory") private var selectedCategory: MetricCategory = .cpu
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: selectedCategory.icon)
                 .symbolRenderingMode(.hierarchical)
                 .font(.system(size: 13, weight: .bold))
-            
+
+            // Temperature shown to the left of the activity indicator
+            if let temp = currentTemperature, temp > 0 {
+                Text(String(format: "%.0f°", temp))
+                    .font(.system(size: 13.5, weight: .bold).monospacedDigit())
+            }
+
             if selectedCategory == .network {
                 networkLabel
             } else {
@@ -19,12 +25,12 @@ struct MenuBarLabel: View {
         .font(.system(size: 13.5, weight: .bold))
         .padding(.horizontal, 4)
     }
-    
+
     // MARK: - Network Label (↓ down ↑ up)
     private var networkLabel: some View {
         Text("↓\(formatSpeed(monitor.network.downloadSpeed)) ↑\(formatSpeed(monitor.network.uploadSpeed))")
     }
-    
+
     private func formatSpeed(_ bytesPerSecond: Double) -> String {
         if bytesPerSecond >= 1_000_000 {
             return String(format: "%.1fM", bytesPerSecond / 1_000_000)
@@ -34,7 +40,19 @@ struct MenuBarLabel: View {
             return String(format: "%.0fB", bytesPerSecond)
         }
     }
-    
+
+    // MARK: - Current temperature for the selected category (nil = no sensor)
+    private var currentTemperature: Double? {
+        switch selectedCategory {
+        case .cpu:     return monitor.cpu.temperature
+        case .gpu:     return monitor.gpu.temperature
+        case .memory:  return monitor.memory.temperature
+        case .disk:    return monitor.disk.temperature
+        case .battery: return monitor.battery.temperature
+        case .network: return nil
+        }
+    }
+
     private var currentValue: String {
         switch selectedCategory {
         case .cpu:

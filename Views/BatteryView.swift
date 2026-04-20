@@ -29,12 +29,19 @@ struct BatteryView: View {
                     value: monitor.battery.powerSource,
                     color: .orange
                 )
-                
+
                 LiquidDetailCard(
                     icon: "clock.fill",
                     label: monitor.battery.isCharging ? "Time to Full" : "Time to Empty",
                     value: formatTime(monitor.battery.isCharging ? monitor.battery.timeToFull : monitor.battery.timeToEmpty),
                     color: .blue
+                )
+
+                LiquidDetailCard(
+                    icon: "thermometer.medium",
+                    label: "Temp",
+                    value: String(format: "%.1f°C", monitor.battery.temperature),
+                    color: .orange
                 )
             }
             
