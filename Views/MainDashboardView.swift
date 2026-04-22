@@ -71,60 +71,63 @@ struct MainDashboardView: View {
     
     // MARK: - Category Picker
     private var categoryPicker: some View {
-        GlassEffectContainer {
-            HStack(spacing: 4) {
-                ForEach(MetricCategory.allCases) { category in
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedCategory = category
-                        }
-                    }) {
-                        VStack(spacing: 3) {
-                            Image(systemName: category.icon)
-                                .font(.title3.weight(selectedCategory == category ? .bold : .regular))
-                            
-                            Text(category.shortTitle)
-                                .font(.caption2.weight(.semibold))
-                            
-                            // Active category live value
-                            Text(liveValue(for: category))
-                                .font(.caption2.weight(.bold).monospacedDigit())
-                                .foregroundStyle(
-                                    selectedCategory == category
-                                    ? AppTheme.Colors.accentColor(for: category)
-                                    : .secondary
-                                )
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(
-                            selectedCategory == category
-                            ? AppTheme.Colors.accentColor(for: category).opacity(0.12)
-                            : Color.clear
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .foregroundStyle(
-                            selectedCategory == category
-                            ? AppTheme.Colors.accentColor(for: category)
-                            : .secondary
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(
-                                    selectedCategory == category
-                                    ? AppTheme.Colors.accentColor(for: category).opacity(0.3)
-                                    : Color.clear,
-                                    lineWidth: 1
-                                )
-                        )
+        HStack(spacing: 8) {
+            ForEach(MetricCategory.allCases) { category in
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedCategory = category
                     }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive())
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: category.icon)
+                            .font(.system(size: 18, weight: selectedCategory == category ? .bold : .medium))
+                        
+                        Text(category.shortTitle)
+                            .font(.system(size: 10, weight: .bold))
+                        
+                        Text(liveValue(for: category))
+                            .font(.system(size: 11, weight: .heavy).monospacedDigit())
+                            .foregroundStyle(
+                                selectedCategory == category
+                                ? AppTheme.Colors.accentColor(for: category)
+                                : .secondary
+                            )
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 72)
+                    .background(
+                        ZStack {
+                            if selectedCategory == category {
+                                AppTheme.Colors.accentColor(for: category).opacity(0.15)
+                            } else {
+                                Color.white.opacity(0.06)
+                            }
+                        }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(
+                                selectedCategory == category
+                                ? AppTheme.Colors.accentColor(for: category).opacity(0.4)
+                                : Color.white.opacity(0.12),
+                                lineWidth: 1.5
+                            )
+                    )
                 }
+                .buttonStyle(.plain)
+                .scaleEffect(selectedCategory == category ? 1.05 : 1.0)
             }
-            .padding(.horizontal, AppTheme.Spacing.small)
-            .padding(.vertical, AppTheme.Spacing.tiny)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .padding(8)
     }
     
     // MARK: - Live Value Helper

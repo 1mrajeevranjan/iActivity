@@ -1,12 +1,13 @@
 # iActivity
 
-A premium, minimalist macOS system monitor featuring a stunning **Liquid Glass HUD** and real-time activity tracking. Built with Swift and SwiftUI for maximum performance and a native aesthetic.
+A premium, minimalist macOS system monitor featuring a stunning **Liquid Glass HUD**, real-time activity tracking, and a **native macOS squircle design**. Built with Swift and SwiftUI for maximum performance and a premium aesthetic.
 
 ![iActivity Preview](icon.png)
 
 ## Core Features
 
 - **Liquid Glass UI**: A beautiful, translucent HUD that floats on your desktop, providing a modern alternative to cluttered system monitors.
+- **Native Squircle Design**: A redesigned category picker featuring unified **macOS-style squircles** (continuous rounded rectangles) for a premium, system-native look and feel.
 - **Full Thermal Monitoring**: Real-time temperature readings for every critical component:
   - **CPU & GPU**: Precise die temperatures for performance tracking.
   - **SoC (Memory)**: Monitor the substrate temperature of the Apple Silicon chip.
@@ -19,8 +20,8 @@ A premium, minimalist macOS system monitor featuring a stunning **Liquid Glass H
 ## How to Use
 
 ### Installation
-1. Download the latest `iActivity.dmg`.
-2. Open the DMG and drag **iActivity** to your **Applications** folder.
+1. Locate the `iActivity.app` bundle in the project root.
+2. Drag **iActivity** to your **Applications** folder.
 3. Launch the app from your Applications folder or via Spotlight.
 
 ### Navigation
