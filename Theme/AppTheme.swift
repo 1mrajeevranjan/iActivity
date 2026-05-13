@@ -2,37 +2,55 @@ import SwiftUI
 
 enum AppTheme {
     enum Colors {
-        static let background = Color.primary.opacity(0.03)
+        // BatterySense "Vibrant Dark" Palette
+        static let background = Color(NSColor(name: nil) { appearance in
+            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                return NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
+            } else {
+                return NSColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1.0)
+            }
+        })
         
-        static let cpuGradient = Gradient(colors: [Color(hex: "5CA4F0"), Color(hex: "8D7CF6")])
-        static let gpuGradient = Gradient(colors: [Color(hex: "FF8585"), Color(hex: "FFF08A")])
-        static let memGradient = Gradient(colors: [Color(hex: "B7EFD7"), Color(hex: "4CCB85")])
-        static let diskGradient = Gradient(colors: [Color(hex: "FFBE62"), Color(hex: "FF9E26")])
-        static let batteryGradient = Gradient(colors: [Color(hex: "AEFCAF"), Color(hex: "349E34")])
-        static let networkGradient = Gradient(colors: [Color(hex: "95DDF9"), Color(hex: "567DF4")])
+        static let cardBackground = Color(NSColor(name: nil) { appearance in
+            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                return NSColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1.0)
+            } else {
+                return NSColor.white
+            }
+        })
+        
+        static let batteryGreen = Color(red: 0.18, green: 0.8, blue: 0.44) // Vibrant Emerald
+        static let brandBlue = Color(red: 0.2, green: 0.6, blue: 1.0)
+        
+        static let cpuGradient = Gradient(colors: [brandBlue, brandBlue.opacity(0.7)])
+        static let gpuGradient = Gradient(colors: [Color.purple, Color.purple.opacity(0.7)])
+        static let memGradient = Gradient(colors: [batteryGreen, batteryGreen.opacity(0.7)])
+        static let diskGradient = Gradient(colors: [Color.orange, Color.orange.opacity(0.7)])
+        static let batteryGradient = Gradient(colors: [batteryGreen, batteryGreen.opacity(0.8)])
+        static let networkGradient = Gradient(colors: [Color.cyan, Color.cyan.opacity(0.7)])
         
         static func accentColor(for category: MetricCategory) -> Color {
             switch category {
-            case .cpu: return Color(hex: "5CA4F0")
-            case .gpu: return Color(hex: "FF8585")
-            case .memory: return Color(hex: "4CCB85")
-            case .disk: return Color(hex: "FF9E26")
-            case .battery: return Color(hex: "349E34")
-            case .network: return Color(hex: "567DF4")
+            case .cpu: return brandBlue
+            case .gpu: return .purple
+            case .memory: return batteryGreen
+            case .disk: return .orange
+            case .battery: return batteryGreen
+            case .network: return .cyan
             }
         }
     }
     
     enum Spacing {
-        static let tiny: CGFloat = 4
-        static let small: CGFloat = 8
+        static let tiny: CGFloat = 6
+        static let small: CGFloat = 10
         static let medium: CGFloat = 16
         static let large: CGFloat = 24
     }
     
     enum Radius {
-        static let card: CGFloat = 12
-        static let inner: CGFloat = 8
+        static let card: CGFloat = 14
+        static let inner: CGFloat = 10
     }
 }
 

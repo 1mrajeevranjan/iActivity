@@ -5,39 +5,41 @@ struct NetworkView: View {
     
     var body: some View {
         VStack(spacing: AppTheme.Spacing.medium) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Real-time Speed")
-                    .font(.headline)
-                
-                HStack(spacing: AppTheme.Spacing.medium) {
-                    SpeedIndicator(label: "Download", speed: monitor.network.downloadSpeed, color: .blue, icon: "arrow.down")
-                    SpeedIndicator(label: "Upload", speed: monitor.network.uploadSpeed, color: .green, icon: "arrow.up")
-                }
+            HStack(spacing: AppTheme.Spacing.medium) {
+                SpeedIndicator(label: "Download", speed: monitor.network.downloadSpeed, color: .blue, icon: "arrow.down.circle.fill")
+                    .vibrantCard()
+                SpeedIndicator(label: "Upload", speed: monitor.network.uploadSpeed, color: AppTheme.Colors.batteryGreen, icon: "arrow.up.circle.fill")
+                    .vibrantCard()
             }
-            .liquidGlass()
             
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                 Text("Traffic History")
                     .font(.headline)
                 
-                VStack(spacing: 8) {
-                    Text("Download History").font(.caption).foregroundStyle(.secondary)
-                    MiniHistoryChart(data: normalize(monitor.network.downloadHistory), gradient: Gradient(colors: [.blue, .cyan]))
+                VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Download").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
+                        MiniHistoryChart(data: normalize(monitor.network.downloadHistory), gradient: Gradient(colors: [.blue, .cyan]))
+                            .frame(height: 50)
+                    }
                     
-                    Text("Upload History").font(.caption).foregroundStyle(.secondary)
-                    MiniHistoryChart(data: normalize(monitor.network.uploadHistory), gradient: Gradient(colors: [.green, .mint]))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Upload").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
+                        MiniHistoryChart(data: normalize(monitor.network.uploadHistory), gradient: Gradient(colors: [AppTheme.Colors.batteryGreen, .mint]))
+                            .frame(height: 50)
+                    }
                 }
             }
-            .liquidGlass()
+            .vibrantCard()
             
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Connection Info")
+                Text("Connection")
                     .font(.headline)
                 
-                DetailRow(label: "Interface", value: "en0 (Wi-Fi)")
-                DetailRow(label: "IP Address", value: "192.168.1.15") // Placeholder
+                DetailRow(label: "Interface", value: "Wi-Fi (en0)")
+                DetailRow(label: "Status", value: "Connected")
             }
-            .liquidGlass()
+            .vibrantCard()
             
             TopProcessesView(
                 title: "Most Active Processes",
@@ -62,16 +64,19 @@ struct SpeedIndicator: View {
     let icon: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                Text(label).font(.caption2)
+                    .foregroundColor(color)
+                    .font(.system(size: 12, weight: .bold))
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
             }
-            .foregroundStyle(.secondary)
             
             Text(formatSpeed(speed))
-                .font(.title3.weight(.bold).monospacedDigit())
-                .foregroundStyle(color)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

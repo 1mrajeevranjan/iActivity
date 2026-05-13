@@ -5,31 +5,38 @@ struct BatteryView: View {
     
     var body: some View {
         VStack(spacing: AppTheme.Spacing.medium) {
-            ZStack {
-                CircularGauge(
-                    value: Double(monitor.battery.level) / 100.0,
-                    title: "Battery",
-                    unit: "\(monitor.battery.level)%",
-                    gradient: AppTheme.Colors.batteryGradient
-                )
-                
-                if monitor.battery.isCharging {
-                    Image(systemName: "bolt.fill")
-                        .font(.title)
-                        .foregroundStyle(.yellow)
-                        .offset(y: -40)
+            HStack(spacing: AppTheme.Spacing.medium) {
+                ZStack {
+                    CircularGauge(
+                        value: Double(monitor.battery.level) / 100.0,
+                        title: "Battery",
+                        unit: "\(monitor.battery.level)%",
+                        gradient: AppTheme.Colors.batteryGradient
+                    )
+                    
+                    if monitor.battery.isCharging {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(AppTheme.Colors.batteryGreen)
+                            .offset(y: -45)
+                    }
                 }
+                .vibrantCard(padding: AppTheme.Spacing.large)
+                
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
+                    Text("Health")
+                        .font(.headline)
+                    
+                    DetailRow(label: "Source", value: monitor.battery.powerSource)
+                    DetailRow(label: "Health", value: "98%")
+                    DetailRow(label: "Cycles", value: "42")
+                    DetailRow(label: "Temp", value: String(format: "%.1f°C", monitor.battery.temperature))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .vibrantCard()
             }
-            .liquidGlass(padding: AppTheme.Spacing.large)
             
             HStack(spacing: AppTheme.Spacing.medium) {
-                LiquidDetailCard(
-                    icon: "plug.fill",
-                    label: "Source",
-                    value: monitor.battery.powerSource,
-                    color: .orange
-                )
-
                 LiquidDetailCard(
                     icon: "clock.fill",
                     label: monitor.battery.isCharging ? "Time to Full" : "Time to Empty",
@@ -38,48 +45,21 @@ struct BatteryView: View {
                 )
 
                 LiquidDetailCard(
-                    icon: "thermometer.medium",
-                    label: "Temp",
-                    value: String(format: "%.1f°C", monitor.battery.temperature),
-                    color: .orange
+                    icon: "bolt.heart.fill",
+                    label: "Energy Impact",
+                    value: String(format: "%.1f W", monitor.battery.watts),
+                    color: .yellow
                 )
             }
             
-            HStack(spacing: AppTheme.Spacing.medium) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Charge Level", systemImage: "battery.100")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                    Text("\(monitor.battery.level)%")
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    MiniHistoryChart(data: monitor.battery.levelHistory, gradient: AppTheme.Colors.batteryGradient, domain: 0...1)
-                        .frame(height: 60)
-                }
-                .liquidGlass()
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Energy Impact", systemImage: "bolt.heart.fill")
-                        .font(.caption)
-                        .foregroundStyle(.yellow)
-                    Text(String(format: "%.1f W", monitor.battery.watts))
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    MiniHistoryChart(data: monitor.battery.powerHistory, gradient: Gradient(colors: [.yellow, .orange]))
-                        .frame(height: 60)
-                }
-                .liquidGlass()
-            }
-            
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Health & Tech")
+                Text("Level History")
                     .font(.headline)
                 
-                HStack(spacing: AppTheme.Spacing.medium) {
-                    DetailRow(label: "Health", value: "98%")
-                    Divider()
-                    DetailRow(label: "Cycles", value: "42")
-                }
+                MiniHistoryChart(data: monitor.battery.levelHistory, gradient: AppTheme.Colors.batteryGradient, domain: 0...1)
+                    .frame(height: 80)
             }
-            .liquidGlass()
+            .vibrantCard()
             
             TopProcessesView(
                 title: "Top Energy Impact",

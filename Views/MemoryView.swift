@@ -9,24 +9,17 @@ struct MemoryView: View {
                 CircularGauge(
                     value: monitor.memory.usagePercentage,
                     title: "Memory",
-                    unit: "Usage",
+                    unit: "\(Int(monitor.memory.usagePercentage * 100))%",
                     gradient: AppTheme.Colors.memGradient
                 )
-                .liquidGlass(padding: AppTheme.Spacing.large)
+                .vibrantCard(padding: AppTheme.Spacing.large)
                 
                 VStack(spacing: AppTheme.Spacing.small) {
                     LiquidDetailCard(
                         icon: "memorychip",
-                        label: "Total RAM",
-                        value: formatBytes(monitor.memory.total),
+                        label: "Usage",
+                        value: "\(Int(monitor.memory.usagePercentage * 100))%",
                         color: AppTheme.Colors.accentColor(for: .memory)
-                    )
-
-                    LiquidDetailCard(
-                        icon: "arrow.up.circle",
-                        label: "Used",
-                        value: formatBytes(monitor.memory.used),
-                        color: .red
                     )
 
                     LiquidDetailCard(
@@ -39,7 +32,7 @@ struct MemoryView: View {
             }
             
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Memory History")
+                Text("Usage History")
                     .font(.headline)
                 
                 MiniHistoryChart(
@@ -47,20 +40,20 @@ struct MemoryView: View {
                     gradient: AppTheme.Colors.memGradient
                 )
             }
-            .liquidGlass()
+            .vibrantCard()
             
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                 Text("Composition")
                     .font(.headline)
                 
                 HStack(spacing: AppTheme.Spacing.small) {
-                    CompositionItem(label: "Wired", value: monitor.memory.wired, total: monitor.memory.total, color: .blue)
-                    CompositionItem(label: "Active", value: monitor.memory.active, total: monitor.memory.total, color: .red)
-                    CompositionItem(label: "Compressed", value: monitor.memory.compressed, total: monitor.memory.total, color: .orange)
+                    CompositionItem(label: "Used", value: monitor.memory.used, total: monitor.memory.total, color: .red)
+                    CompositionItem(label: "Active", value: monitor.memory.active, total: monitor.memory.total, color: .orange)
+                    CompositionItem(label: "Compressed", value: monitor.memory.compressed, total: monitor.memory.total, color: .blue)
                     CompositionItem(label: "Free", value: monitor.memory.free, total: monitor.memory.total, color: .green)
                 }
             }
-            .liquidGlass()
+            .vibrantCard()
             
             TopProcessesView(
                 title: "Top Memory Processes",
@@ -69,13 +62,6 @@ struct MemoryView: View {
                 color: AppTheme.Colors.accentColor(for: .memory)
             )
         }
-    }
-    
-    private func formatBytes(_ bytes: Double) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useGB, .useMB]
-        formatter.countStyle = .memory
-        return formatter.string(fromByteCount: Int64(bytes))
     }
 }
 
@@ -87,12 +73,14 @@ struct CompositionItem: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Circle().fill(color).frame(width: 8, height: 8)
-                Text(label).font(.caption2).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Circle().fill(color).frame(width: 6, height: 6)
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
             }
             Text("\(Int((value/total)*100))%")
-                .font(.headline.weight(.bold).monospacedDigit())
+                .font(.system(size: 16, weight: .bold, design: .rounded))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

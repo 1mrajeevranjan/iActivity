@@ -7,128 +7,109 @@ struct MainDashboardView: View {
     @State private var animateBackground = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            categoryPicker
+        ZStack {
+            AppTheme.Colors.background
+                .ignoresSafeArea()
             
-            Divider()
-                .padding(.horizontal, AppTheme.Spacing.medium)
-            
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.medium) {
-                    switch selectedCategory {
-                    case .cpu:
-                        CPUView()
-                    case .gpu:
-                        GPUView()
-                    case .memory:
-                        MemoryView()
-                    case .disk:
-                        DiskView()
-                    case .battery:
-                        BatteryView()
-                    case .network:
-                        NetworkView()
+            // Subtle animated background glow
+            if isDarkMode {
+                Circle()
+                    .fill(AppTheme.Colors.accentColor(for: selectedCategory).opacity(0.06))
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 100)
+                    .offset(x: animateBackground ? 100 : -100, y: animateBackground ? -100 : 100)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                            animateBackground.toggle()
+                        }
                     }
+            }
+
+            VStack(spacing: 0) {
+                categoryPicker
+                
+                // Content Area
+                ScrollView {
+                    VStack(spacing: AppTheme.Spacing.medium) {
+                        switch selectedCategory {
+                        case .cpu:
+                            CPUView()
+                        case .gpu:
+                            GPUView()
+                        case .memory:
+                            MemoryView()
+                        case .disk:
+                            DiskView()
+                        case .battery:
+                            BatteryView()
+                        case .network:
+                            NetworkView()
+                        }
+                    }
+                    .padding(AppTheme.Spacing.medium)
                 }
-                .padding(AppTheme.Spacing.medium)
             }
         }
         .frame(width: 420, height: 580)
-        .background {
-            ZStack {
-                Color(isDarkMode ? .black : .white)
-                
-                GeometryReader { geo in
-                    Circle()
-                        .fill(AppTheme.Colors.cpuGradient)
-                        .frame(width: 350, height: 350)
-                        .blur(radius: 80)
-                        .offset(x: animateBackground ? geo.size.width - 200 : -100,
-                                y: animateBackground ? -100 : geo.size.height - 200)
-                        
-                    Circle()
-                        .fill(AppTheme.Colors.memGradient)
-                        .frame(width: 300, height: 300)
-                        .blur(radius: 100)
-                        .offset(x: animateBackground ? -50 : geo.size.width - 150,
-                                y: animateBackground ? geo.size.height - 150 : 50)
-                }
-            }
-            .ignoresSafeArea()
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(isDarkMode ? 0.1 : 0.4), lineWidth: 1)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
-                animateBackground.toggle()
-            }
-        }
         .preferredColorScheme(isDarkMode ? .dark : .light)
     }
     
     // MARK: - Category Picker
     private var categoryPicker: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             ForEach(MetricCategory.allCases) { category in
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedCategory = category
-                    }
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: category.icon)
-                            .font(.system(size: 18, weight: selectedCategory == category ? .bold : .medium))
-                        
-                        Text(category.shortTitle)
-                            .font(.system(size: 10, weight: .bold))
-                        
-                        Text(liveValue(for: category))
-                            .font(.system(size: 11, weight: .heavy).monospacedDigit())
-                            .foregroundStyle(
-                                selectedCategory == category
-                                ? AppTheme.Colors.accentColor(for: category)
-                                : .secondary
-                            )
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 72)
-                    .background(
-                        ZStack {
-                            if selectedCategory == category {
-                                AppTheme.Colors.accentColor(for: category).opacity(0.15)
-                            } else {
-                                Color.white.opacity(0.06)
-                            }
-                        }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(
-                                selectedCategory == category
-                                ? AppTheme.Colors.accentColor(for: category).opacity(0.4)
-                                : Color.white.opacity(0.12),
-                                lineWidth: 1.5
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-                .scaleEffect(selectedCategory == category ? 1.05 : 1.0)
+                navButton(category: category)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-        .padding(8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 12)
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Divider().opacity(0.4), alignment: .bottom)
+        }
     }
+
+    private func navButton(category: MetricCategory) -> some View {
+        let isSelected = selectedCategory == category
+        let accent = AppTheme.Colors.accentColor(for: category)
+        
+        return Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedCategory = category
+            }
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(accent.opacity(0.12))
+                            .matchedGeometryEffect(id: "navBG", in: navNamespace)
+                    }
+                    
+                    Image(systemName: isSelected ? "\(category.icon).fill" : category.icon)
+                        .font(.system(size: 16, weight: isSelected ? .bold : .medium))
+                }
+                .frame(width: 36, height: 32)
+                
+                VStack(spacing: 0) {
+                    Text(category.shortTitle)
+                        .font(.system(size: 9, weight: .black))
+                        .opacity(isSelected ? 1.0 : 0.6)
+                    
+                    Text(liveValue(for: category))
+                        .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        .opacity(isSelected ? 0.9 : 0.5)
+                }
+            }
+            .foregroundColor(isSelected ? accent : .secondary)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @Namespace private var navNamespace
     
     // MARK: - Live Value Helper
     /// Returns a compact live value string for each category to show in the picker tabs

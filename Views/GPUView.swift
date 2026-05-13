@@ -9,21 +9,21 @@ struct GPUView: View {
                 CircularGauge(
                     value: monitor.gpu.utilization,
                     title: "GPU",
-                    unit: "Utilization",
+                    unit: "\(Int(monitor.gpu.utilization * 100))%",
                     gradient: AppTheme.Colors.gpuGradient
                 )
-                .liquidGlass(padding: AppTheme.Spacing.large)
+                .vibrantCard(padding: AppTheme.Spacing.large)
 
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                    Text("GPU Details")
+                    Text("Details")
                         .font(.headline)
 
-                    DetailRow(label: "Model", value: "Apple M4")
-                    DetailRow(label: "VRAM Total", value: formatBytes(monitor.gpu.vramTotal))
+                    DetailRow(label: "VRAM", value: formatBytes(monitor.gpu.vramTotal))
                     DetailRow(label: "Temp", value: String(format: "%.1f°C", monitor.gpu.temperature))
+                    DetailRow(label: "Status", value: monitor.gpu.utilization > 0.8 ? "High Load" : "Normal")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlass()
+                .vibrantCard()
             }
 
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
@@ -35,7 +35,7 @@ struct GPUView: View {
                     gradient: AppTheme.Colors.gpuGradient
                 )
             }
-            .liquidGlass()
+            .vibrantCard()
 
             TopProcessesView(
                 title: "Top GPU Processes",

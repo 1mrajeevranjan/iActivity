@@ -7,20 +7,23 @@ struct LiquidDetailCard: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .foregroundStyle(color)
-                    .font(.headline.weight(.bold))
+                    .foregroundColor(color)
+                    .font(.system(size: 12, weight: .bold))
                 Text(label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary.opacity(0.8))
-                Spacer()
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
             }
             
             Text(value)
-                .font(.title3.weight(.bold).monospacedDigit())
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .liquidGlass()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .vibrantCard(padding: 14)
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PhotorealisticGlass: ViewModifier {
+struct VibrantDarkCard: ViewModifier {
     var radius: CGFloat
     var padding: CGFloat
     
@@ -10,66 +10,47 @@ struct PhotorealisticGlass: ViewModifier {
         content
             .padding(padding)
             .background {
-                // Base frosted reflection
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            }
-            .background {
-                // Ambient lighting layer
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.05 : 0.4),
-                                Color.white.opacity(0.0),
-                                Color.white.opacity(colorScheme == .dark ? 0.0 : 0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                ZStack {
+                    AppTheme.Colors.cardBackground
+                    
+                    // Subtle mesh-like gradient for depth
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.2),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
+                }
             }
-            // Glass Rim Refraction Edge
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(
+                    .strokeBorder(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.3 : 0.8),
-                                Color.white.opacity(colorScheme == .dark ? 0.05 : 0.1),
-                                Color.white.opacity(colorScheme == .dark ? 0.0 : 0.0),
-                                Color.white.opacity(colorScheme == .dark ? 0.1 : 0.3)
+                                Color.white.opacity(colorScheme == .dark ? 0.15 : 0.4),
+                                Color.white.opacity(colorScheme == .dark ? 0.02 : 0.1),
+                                Color.white.opacity(colorScheme == .dark ? 0.05 : 0.2)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 1
+                        lineWidth: 0.8
                     )
-                    .blendMode(.screen)
             }
-            // Inner convex shadow
-            .overlay {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(Color.black.opacity(colorScheme == .dark ? 0.4 : 0.05), lineWidth: 1)
-                    .blur(radius: 1)
-                    .offset(x: 1, y: 1)
-                    .mask(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            }
-            // Deep drop shadow
-            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.5 : 0.15), radius: 20, x: 0, y: 10)
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 12, x: 0, y: 6)
     }
 }
 
 extension View {
-    func liquidGlass(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium) -> some View {
-        self.modifier(PhotorealisticGlass(radius: radius, padding: padding))
+    func vibrantCard(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium) -> some View {
+        self.modifier(VibrantDarkCard(radius: radius, padding: padding))
     }
     
-    func liquidGlassInteractive(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium) -> some View {
-        self
-            .modifier(PhotorealisticGlass(radius: radius, padding: padding))
-            // Interactive scaling for buttons handled externally or by using standard Button styles
-            .scaleEffect(1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: 1.0)
+    // Alias for compatibility during transition
+    func liquidGlass(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium) -> some View {
+        self.vibrantCard(radius: radius, padding: padding)
     }
 }

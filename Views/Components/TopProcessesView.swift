@@ -12,102 +12,80 @@ struct TopProcessesView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Section title
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "list.number")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(color)
+                Image(systemName: "list.bullet.rectangle.portrait.fill")
+                    .foregroundColor(color)
+                    .font(.system(size: 12, weight: .bold))
                 Text(title)
-                    .font(.subheadline.weight(.bold))
+                    .font(.system(size: 13, weight: .bold))
+                Spacer()
             }
+            .padding(.bottom, 2)
             
             if processes.isEmpty {
                 HStack {
                     Spacer()
-                    VStack(spacing: 4) {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                        Text("Collecting data…")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 8)
+                    ProgressView().scaleEffect(0.8)
                     Spacer()
                 }
+                .padding(.vertical, 20)
             } else {
-                // Column headers
-                HStack(spacing: 0) {
-                    Text("#")
-                        .frame(width: 20, alignment: .center)
-                    Text("Process")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("CPU")
-                        .frame(width: 55, alignment: .trailing)
-                    Text("MEM")
-                        .frame(width: 55, alignment: .trailing)
-                }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                
-                // Process rows
-                ForEach(Array(processes.enumerated()), id: \.element.id) { index, process in
-                    HStack(spacing: 0) {
-                        // Rank badge
-                        ZStack {
-                            Circle()
-                                .fill(color.opacity(Double(5 - index) / 6.0))
-                                .frame(width: 16, height: 16)
-                            Text("\(index + 1)")
-                                .font(.caption2.weight(.heavy))
-                                .foregroundStyle(.white)
+                VStack(spacing: 4) {
+                    ForEach(Array(processes.enumerated().prefix(5)), id: \.element.id) { index, process in
+                        VStack(spacing: 0) {
+                            HStack(spacing: 10) {
+                                ZStack {
+                                    Circle()
+                                        .fill(color.opacity(0.1))
+                                        .frame(width: 18, height: 18)
+                                    Text("\(index + 1)")
+                                        .font(.system(size: 9, weight: .black, design: .rounded))
+                                        .foregroundColor(color)
+                                }
+                                
+                                Text(process.name)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                                
+                                Spacer()
+                                
+                                Text(metric == .cpu ? formatCPU(process.cpuPercent) : formatMemory(process.memoryMB))
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundColor(color)
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 4)
                         }
-                        .frame(width: 20)
-                        
-                        // Process name
-                        Text(process.name)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 4)
-                        
-                        // CPU value
-                        Text(formatCPU(process.cpuPercent))
-                            .font(.caption.weight(metric == .cpu ? .bold : .regular).monospacedDigit())
-                            .foregroundStyle(metric == .cpu ? color : .secondary)
-                            .frame(width: 55, alignment: .trailing)
-                        
-                        // Memory value
-                        Text(formatMemory(process.memoryMB))
-                            .font(.caption.weight(metric == .memory ? .bold : .regular).monospacedDigit())
-                            .foregroundStyle(metric == .memory ? color : .secondary)
-                            .frame(width: 55, alignment: .trailing)
-                    }
-                    .padding(.vertical, 3)
-                    
-                    if index < processes.count - 1 {
-                        Divider().opacity(0.2)
+                        .background {
+                            // Relative bar background
+                            GeometryReader { geo in
+                                let maxVal = processes.first?.cpuPercent ?? 100.0
+                                let currentVal = metric == .cpu ? process.cpuPercent : (process.memoryMB / 1024.0) // simplified relative scale
+                                let relativeWidth = maxVal > 0 ? (currentVal / maxVal) : 0
+                                
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(color.opacity(0.05))
+                                    .frame(width: geo.size.width * CGFloat(relativeWidth))
+                                    .animation(.spring(), value: relativeWidth)
+                            }
+                        }
                     }
                 }
             }
         }
-        .liquidGlass()
+        .vibrantCard(padding: 12)
     }
     
-    // MARK: - Formatters
-    
     private func formatCPU(_ value: Double) -> String {
-        if value >= 100 {
-            return String(format: "%.0f%%", value)
-        }
-        return String(format: "%.1f%%", value)
+        String(format: "%.1f%%", value)
     }
     
     private func formatMemory(_ mb: Double) -> String {
         if mb >= 1024 {
-            return String(format: "%.1fG", mb / 1024)
+            return String(format: "%.1f GB", mb / 1024)
         }
-        return String(format: "%.0fM", mb)
+        return String(format: "%.0f MB", mb)
     }
 }

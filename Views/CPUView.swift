@@ -8,22 +8,23 @@ struct CPUView: View {
             HStack(spacing: AppTheme.Spacing.medium) {
                 CircularGauge(
                     value: monitor.cpu.usage,
-                    title: "Total CPU",
-                    unit: "Usage",
+                    title: "CPU",
+                    unit: "\(Int(monitor.cpu.usage * 100))%",
                     gradient: AppTheme.Colors.cpuGradient
                 )
-                .liquidGlass(padding: AppTheme.Spacing.large)
+                .vibrantCard(padding: AppTheme.Spacing.large)
                 
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                     Text("Details")
                         .font(.headline)
                     
-                    DetailRow(label: "Model", value: monitor.cpu.modelName)
                     DetailRow(label: "Cores", value: "\(monitor.cpu.coreUsages.count)")
                     DetailRow(label: "Temp", value: String(format: "%.1f°C", monitor.cpu.temperature))
+                    DetailRow(label: "Model", value: monitor.cpu.modelName)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlass()
+                .vibrantCard()
             }
             
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
@@ -35,7 +36,7 @@ struct CPUView: View {
                     gradient: AppTheme.Colors.cpuGradient
                 )
             }
-            .liquidGlass()
+            .vibrantCard()
             
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                 Text("Cores Activity")
@@ -47,7 +48,7 @@ struct CPUView: View {
                     }
                 }
             }
-            .liquidGlass()
+            .vibrantCard()
             
             TopProcessesView(
                 title: "Top CPU Processes",

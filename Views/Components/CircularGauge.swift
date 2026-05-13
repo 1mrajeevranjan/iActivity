@@ -8,26 +8,43 @@ struct CircularGauge: View {
     
     var body: some View {
         ZStack {
+            // Background track with subtle depth
             Circle()
-                .stroke(Color.primary.opacity(0.1), lineWidth: 10)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 10)
             
+            // Subtle glow for the progress ring
             Circle()
                 .trim(from: 0, to: CGFloat(value))
                 .stroke(
-                    AngularGradient(gradient: gradient, center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
+                    LinearGradient(gradient: gradient, startPoint: .top, endPoint: .bottom),
                     style: StrokeStyle(lineWidth: 10, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: value)
+                .blur(radius: 4)
+                .opacity(0.3)
+                .animation(.spring(response: 1.0, dampingFraction: 0.8), value: value)
+
+            // Main progress ring
+            Circle()
+                .trim(from: 0, to: CGFloat(value))
+                .stroke(
+                    LinearGradient(gradient: gradient, startPoint: .top, endPoint: .bottom),
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .animation(.spring(response: 1.0, dampingFraction: 0.8), value: value)
             
             VStack(spacing: 0) {
-                Text("\(Int(value * 100))")
-                    .font(.title2.weight(.bold).monospacedDigit())
                 Text(unit)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(1)
             }
         }
-        .frame(width: 120, height: 120)
+        .frame(width: 130, height: 130)
     }
 }
