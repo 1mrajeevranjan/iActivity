@@ -15,9 +15,17 @@ class PanelManager: ObservableObject {
             if panel.isVisible {
                 panel.orderOut(nil)
             } else {
-                panel.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
+                show()
             }
+        } else {
+            createPanel()
+        }
+    }
+
+    func show() {
+        if let panel = panel {
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
         } else {
             createPanel()
         }

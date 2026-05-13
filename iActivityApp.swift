@@ -85,40 +85,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let categoryRaw = UserDefaults.standard.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
         let category = MetricCategory(rawValue: categoryRaw) ?? .cpu
 
-        // Setup Icon
-        let config = NSImage.SymbolConfiguration(pointSize: 13.5, weight: .bold)
-        if let image = NSImage(systemSymbolName: category.icon, accessibilityDescription: nil) {
-            button.image = image.withSymbolConfiguration(config)
-            button.imagePosition = .imageLeft
-        }
-
-        // Temperature string (shown to the left of the usage value)
         let tempStr = temperatureString(for: category)
 
-        // Usage value
         var usageStr = ""
+        var isCritical = false
+        var isWarning = false
+        var iconName = category.icon
+
         switch category {
         case .cpu:
-            usageStr = "\(Int(monitor.cpu.usage * 100))%"
+            let val = monitor.cpu.usage
+            usageStr = "\(Int(val * 100))%"
+            isCritical = val >= 0.90
+            isWarning = val >= 0.70
         case .gpu:
-            usageStr = "\(Int(monitor.gpu.utilization * 100))%"
+            let val = monitor.gpu.utilization
+            usageStr = "\(Int(val * 100))%"
+            isCritical = val >= 0.90
+            isWarning = val >= 0.70
         case .memory:
-            usageStr = "\(Int(monitor.memory.usagePercentage * 100))%"
+            let val = monitor.memory.usagePercentage
+            usageStr = "\(Int(val * 100))%"
+            isCritical = val >= 0.90
+            isWarning = val >= 0.75
         case .disk:
-            usageStr = "\(Int(monitor.disk.usagePercentage * 100))%"
+            let val = monitor.disk.usagePercentage
+            usageStr = "\(Int(val * 100))%"
+            isCritical = val >= 0.95
+            isWarning = val >= 0.85
         case .battery:
-            usageStr = "\(monitor.battery.level)%"
+            let val = monitor.battery.level
+            let charging = monitor.battery.isCharging
+            usageStr = "\(val)%"
+            isCritical = (val <= 10 && !charging)
+            isWarning = (val <= 20 && !charging)
+            
+            if charging       { iconName = "battery.100.bolt" }
+            else if val > 80  { iconName = "battery.100" }
+            else if val > 50  { iconName = "battery.75"  }
+            else if val > 25  { iconName = "battery.50"  }
+            else if val > 10  { iconName = "battery.25"  }
+            else              { iconName = "battery.0" }
+            
         case .network:
             let down = formatSpeed(monitor.network.downloadSpeed)
             let up = formatSpeed(monitor.network.uploadSpeed)
             usageStr = "↓\(down) ↑\(up)"
         }
 
-        // Compose: [temp] [usage]  — temperature to the left, usage to the right (before the icon)
-        if tempStr.isEmpty {
-            button.title = usageStr
-        } else {
-            button.title = "\(tempStr) \(usageStr)"
+        let color: NSColor = isCritical ? .systemRed : (isWarning ? .systemOrange : .labelColor)
+        let text = tempStr.isEmpty ? usageStr : "\(tempStr) \(usageStr)"
+        
+        button.attributedTitle = NSAttributedString(
+            string: text + " ",
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
+                .foregroundColor: color
+            ]
+        )
+
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        if let image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
+            button.image = image.withSymbolConfiguration(config)
+            button.imagePosition = .imageRight
         }
     }
 
@@ -158,23 +187,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
             let menu = NSMenu()
+            menu.autoenablesItems = false
+
+            let dashboardItem = NSMenuItem(title: "Open iActivity Dashboard", action: #selector(openDashboard), keyEquivalent: "o")
+            dashboardItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
+            dashboardItem.target = self
+            menu.addItem(dashboardItem)
 
             let themeItem = NSMenuItem(title: "Toggle Appearance", action: #selector(toggleTheme), keyEquivalent: "t")
+            themeItem.image = NSImage(systemSymbolName: "circle.lefthalf.filled", accessibilityDescription: nil)
+            themeItem.target = self
             menu.addItem(themeItem)
 
             let setupItem = NSMenuItem(title: "Setup & Permissions...", action: #selector(openSetup), keyEquivalent: "s")
+            setupItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
+            setupItem.target = self
             menu.addItem(setupItem)
 
             menu.addItem(NSMenuItem.separator())
 
-            menu.addItem(NSMenuItem(title: "Quit iActivity", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            let quitItem = NSMenuItem(title: "Quit iActivity", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+            menu.addItem(quitItem)
 
             statusItem?.menu = menu
             statusItem?.button?.performClick(nil)
-            statusItem?.menu = nil
+            
+            // Match BatterySense pattern: clear menu reference so it doesn't hijack left-click
+            DispatchQueue.main.async { [weak self] in
+                self?.statusItem?.menu = nil
+            }
         } else {
             panelManager?.toggle()
         }
+    }
+
+    @objc func openDashboard() {
+        panelManager?.show()
     }
 
     @objc func toggleTheme() {
