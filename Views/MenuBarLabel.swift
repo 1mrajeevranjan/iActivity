@@ -6,24 +6,40 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: selectedCategory.icon)
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 13, weight: .bold))
-
             // Temperature shown to the left of the activity indicator
             if let temp = currentTemperature, temp > 0 {
                 Text(String(format: "%.0f°", temp))
-                    .font(.system(size: 13.5, weight: .bold).monospacedDigit())
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
+                    .foregroundColor(.secondary)
             }
 
             if selectedCategory == .network {
                 networkLabel
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
             } else {
                 Text(currentValue)
+                    .font(.system(size: 12, weight: .medium, design: .rounded).monospacedDigit())
             }
+
+            Image(systemName: iconName)
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: 12, weight: .medium))
         }
-        .font(.system(size: 13.5, weight: .bold))
         .padding(.horizontal, 4)
+    }
+
+    private var iconName: String {
+        if selectedCategory == .battery {
+            let val = monitor.battery.level
+            let charging = monitor.battery.isCharging
+            if charging       { return "battery.100.bolt" }
+            if val > 80  { return "battery.100" }
+            if val > 50  { return "battery.75"  }
+            if val > 25  { return "battery.50"  }
+            if val > 10  { return "battery.25"  }
+            return "battery.0"
+        }
+        return selectedCategory.icon
     }
 
     // MARK: - Network Label (↓ down ↑ up)

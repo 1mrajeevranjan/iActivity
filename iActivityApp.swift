@@ -134,17 +134,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let color: NSColor = isCritical ? .systemRed : (isWarning ? .systemOrange : .labelColor)
-        let text = tempStr.isEmpty ? usageStr : "\(tempStr) \(usageStr)"
         
-        button.attributedTitle = NSAttributedString(
-            string: text + " ",
+        let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        let finalString = NSMutableAttributedString()
+        
+        if !tempStr.isEmpty {
+            let tempAttr = NSAttributedString(
+                string: tempStr + " ",
+                attributes: [
+                    .font: numberFont,
+                    .foregroundColor: NSColor.secondaryLabelColor
+                ]
+            )
+            finalString.append(tempAttr)
+        }
+        
+        let usageAttr = NSAttributedString(
+            string: usageStr + " ",
             attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
+                .font: numberFont,
                 .foregroundColor: color
             ]
         )
+        finalString.append(usageAttr)
+        
+        button.attributedTitle = finalString
 
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
         if let image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
             button.image = image.withSymbolConfiguration(config)
             button.imagePosition = .imageRight
