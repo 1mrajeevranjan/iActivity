@@ -28,8 +28,8 @@ struct BatteryView: View {
                         .font(.headline)
                     
                     DetailRow(label: "Source", value: monitor.battery.powerSource)
-                    DetailRow(label: "Health", value: "98%")
-                    DetailRow(label: "Cycles", value: "42")
+                    DetailRow(label: "Health", value: monitor.battery.healthPercentage > 0 ? String(format: "%.0f%%", monitor.battery.healthPercentage) : "—")
+                    DetailRow(label: "Cycles", value: monitor.battery.cycleCount > 0 ? String(monitor.battery.cycleCount) : "—")
                     DetailRow(label: "Temp", value: String(format: "%.1f°C", monitor.battery.temperature))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,3 +80,4 @@ struct BatteryView: View {
         return "\(mins)m"
     }
 }
+

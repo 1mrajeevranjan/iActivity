@@ -4,30 +4,17 @@ struct MainDashboardView: View {
     @Environment(SystemMonitor.self) private var monitor
     @AppStorage("selectedCategory") private var selectedCategory: MetricCategory = .cpu
     @AppStorage("isDarkMode") private var isDarkMode: Bool = true
-    @State private var animateBackground = false
     
     var body: some View {
         ZStack {
-            AppTheme.Colors.background
-                .ignoresSafeArea()
-            
-            // Subtle animated background glow
-            if isDarkMode {
-                Circle()
-                    .fill(AppTheme.Colors.accentColor(for: selectedCategory).opacity(0.06))
-                    .frame(width: 400, height: 400)
-                    .blur(radius: 100)
-                    .offset(x: animateBackground ? 100 : -100, y: animateBackground ? -100 : 100)
-                    .onAppear {
-                        withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
-                            animateBackground.toggle()
-                        }
-                    }
-            }
+            // Liquid Glass background with rounded corners and subtle border
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 12)
 
             VStack(spacing: 0) {
-                categoryPicker
-                
+                categoryTabs
+
                 // Content Area
                 ScrollView {
                     VStack(spacing: AppTheme.Spacing.medium) {
@@ -49,67 +36,65 @@ struct MainDashboardView: View {
                     .padding(AppTheme.Spacing.medium)
                 }
             }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
+        .padding(6)
         .frame(width: 420, height: 580)
         .preferredColorScheme(isDarkMode ? .dark : .light)
     }
     
-    // MARK: - Category Picker
-    private var categoryPicker: some View {
-        HStack(spacing: 4) {
+    // MARK: - Category Tabs (custom macOS-styled segmented tabs)
+    private var categoryTabs: some View {
+        HStack(spacing: 0) {
             ForEach(MetricCategory.allCases) { category in
-                navButton(category: category)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 12)
-        .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(Divider().opacity(0.4), alignment: .bottom)
-        }
-    }
-
-    private func navButton(category: MetricCategory) -> some View {
-        let isSelected = selectedCategory == category
-        let accent = AppTheme.Colors.accentColor(for: category)
-        
-        return Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                selectedCategory = category
-            }
-        } label: {
-            VStack(spacing: 4) {
-                ZStack {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(accent.opacity(0.12))
-                            .matchedGeometryEffect(id: "navBG", in: navNamespace)
+                let isSelected = selectedCategory == category
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                        selectedCategory = category
                     }
-                    
-                    Image(systemName: isSelected ? "\(category.icon).fill" : category.icon)
-                        .font(.system(size: 16, weight: isSelected ? .bold : .medium))
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: category.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(category.shortTitle)
+                            .font(.system(size: 11, weight: .semibold))
+                            .textCase(.uppercase)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .contentShape(Rectangle())
                 }
-                .frame(width: 36, height: 32)
-                
-                VStack(spacing: 0) {
-                    Text(category.shortTitle)
-                        .font(.system(size: 9, weight: .black))
-                        .opacity(isSelected ? 1.0 : 0.6)
-                    
-                    Text(liveValue(for: category))
-                        .font(.system(size: 9, weight: .bold).monospacedDigit())
-                        .opacity(isSelected ? 0.9 : 0.5)
-                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.accentColor.opacity(0.18))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(Color.accentColor.opacity(0.6), lineWidth: 1)
+                                )
+                        }
+                    }
+                )
+                .accessibilityLabel(Text(category.shortTitle))
             }
-            .foregroundColor(isSelected ? accent : .secondary)
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.thinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
-
-    @Namespace private var navNamespace
     
     // MARK: - Live Value Helper
     /// Returns a compact live value string for each category to show in the picker tabs

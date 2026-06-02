@@ -15,6 +15,9 @@ class BatteryMonitor {
     var watts: Double = 0
     var levelHistory: [Double] = Array(repeating: 0, count: 60)
     var powerHistory: [Double] = Array(repeating: 0, count: 60)
+    
+    var healthPercentage: Double = 0
+    var cycleCount: Int = 0
 
     private var timer: Timer?
 
@@ -62,6 +65,21 @@ class BatteryMonitor {
                     self.timeToEmpty = timeToEmpty
                 }
                 
+                if let cycles = description["Cycle Count"] as? Int {
+                    self.cycleCount = cycles
+                }
+                
+                if let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
+                   let designCapacity = description["DesignCapacity"] as? Int,
+                   designCapacity > 0 {
+                    self.healthPercentage = Double(maxCapacity) / Double(designCapacity) * 100.0
+                } else if let capacity = description[kIOPSCurrentCapacityKey] as? Int,
+                          let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
+                          maxCapacity > 0 {
+                    // fallback: show current percentage of max as proxy
+                    self.healthPercentage = Double(capacity) / Double(maxCapacity) * 100.0
+                }
+                
                 // Calculate Watts
                 if let voltage = description["Voltage"] as? Int,
                    let amperage = description["Current"] as? Int {
@@ -71,6 +89,15 @@ class BatteryMonitor {
                     // Fallback for Apple Silicon or detailed stats from IORegistry
                     self.watts = fetchWattsFromIORegistry()
                 }
+            }
+        }
+        
+        // Fallbacks via IORegistry if IOPS dictionary omitted details
+        if self.cycleCount == 0 || self.healthPercentage == 0 {
+            let props = fetchBatteryPropertiesFromIORegistry()
+            if self.cycleCount == 0, let c = props.cycleCount { self.cycleCount = c }
+            if self.healthPercentage == 0, let max = props.maxCapacity, let design = props.designCapacity, design > 0 {
+                self.healthPercentage = Double(max) / Double(design) * 100.0
             }
         }
         
@@ -103,5 +130,43 @@ class BatteryMonitor {
             IOObjectRelease(iter)
         }
         return foundWatts
+    }
+    
+    private func fetchBatteryPropertiesFromIORegistry() -> (cycleCount: Int?, designCapacity: Int?, maxCapacity: Int?) {
+        let matching = IOServiceMatching("AppleSmartBattery")
+        var iter: io_iterator_t = 0
+        var foundCycleCount: Int? = nil
+        var foundDesignCapacity: Int? = nil
+        var foundMaxCapacity: Int? = nil
+        
+        if IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) == kIOReturnSuccess {
+            var service = IOIteratorNext(iter)
+            while service != 0 {
+                var props: Unmanaged<CFMutableDictionary>?
+                if IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == kIOReturnSuccess,
+                   let dict = props?.takeRetainedValue() as? [String: Any] {
+                    
+                    if foundCycleCount == nil, let cycleCount = dict["CycleCount"] as? Int {
+                        foundCycleCount = cycleCount
+                    }
+                    if foundDesignCapacity == nil, let designCapacity = dict["DesignCapacity"] as? Int {
+                        foundDesignCapacity = designCapacity
+                    }
+                    if foundMaxCapacity == nil, let maxCapacity = dict["MaxCapacity"] as? Int {
+                        foundMaxCapacity = maxCapacity
+                    }
+                    
+                    if foundCycleCount != nil && foundDesignCapacity != nil && foundMaxCapacity != nil {
+                        IOObjectRelease(service)
+                        break
+                    }
+                }
+                IOObjectRelease(service)
+                service = IOIteratorNext(iter)
+            }
+            IOObjectRelease(iter)
+        }
+        
+        return (cycleCount: foundCycleCount, designCapacity: foundDesignCapacity, maxCapacity: foundMaxCapacity)
     }
 }

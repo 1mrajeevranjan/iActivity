@@ -65,7 +65,7 @@ struct OnboardingView: View {
             .padding(.bottom, 30)
         }
         .frame(width: 400, height: 500)
-        .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
+        .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 16))
     }
 }
 
@@ -105,17 +105,31 @@ struct OptionRow: View {
 struct VisualEffectView: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let blendingMode: NSVisualEffectView.BlendingMode
+    var cornerRadius: CGFloat = 0
     
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = material
         view.blendingMode = blendingMode
         view.state = .active
+        view.wantsLayer = true
+        if cornerRadius > 0 {
+            view.layer?.cornerRadius = cornerRadius
+            view.layer?.masksToBounds = true
+        }
         return view
     }
     
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
+        if cornerRadius > 0 {
+            nsView.wantsLayer = true
+            nsView.layer?.cornerRadius = cornerRadius
+            nsView.layer?.masksToBounds = true
+        } else {
+            nsView.layer?.cornerRadius = 0
+            nsView.layer?.masksToBounds = false
+        }
     }
 }
