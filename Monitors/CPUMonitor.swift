@@ -38,11 +38,13 @@ class CPUMonitor {
     func stop() {
         timer?.invalidate()
         timer = nil
-        if let info = previousInfo {
-            let infoSize = MemoryLayout<integer_t>.stride * Int(previousCount)
-            vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: info)), vm_size_t(infoSize))
-            previousInfo = nil
-        }
+        // Deliberately keeps `previousInfo` — clearing it here (as this used to) means every
+        // restart's first tick has no baseline to diff against, so `update()` produces no data
+        // at all: 0% usage, an empty core list, until the *second* tick. Invisible when the
+        // monitor only ever started once at launch, but glaring now that pausing/resuming with
+        // the dashboard panel restarts it constantly — every reopened tab flashed blank. Every
+        // other monitor already gets this right; the stale-but-present baseline just means the
+        // first post-resume reading averages over the paused interval, same as they do.
     }
     
     private func update() {

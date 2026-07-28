@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SystemMonitor.self) private var monitor
-    @Environment(\.dismiss) private var dismiss
 
     @State private var launchAtLogin = AppSetup.shared.isLaunchAtLoginEnabled
     @AppStorage("showInDock") private var showInDock: Bool = false
@@ -85,7 +84,8 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 420, height: 540)
         .preferredColorScheme(appearanceMode.colorScheme)
-        .onExitCommand { dismiss() }
+        // Esc-to-close is handled by a local NSEvent monitor in AppDelegate.showSettings() —
+        // `.onExitCommand` never fired here, apparently swallowed by Form before it could see Esc.
     }
 }
 

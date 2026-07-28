@@ -111,6 +111,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 titleLabel.frame.origin = NSPoint(x: windowCenterInAccessorySpace - titleLabel.frame.width / 2, y: 3)
             }
 
+            // SwiftUI's `.onExitCommand` never fired inside the Form — it appears to consume Esc
+            // itself before the exit-command handler sees it. A local monitor on the window
+            // reliably closes it on Esc regardless of what SwiftUI does with the key event.
+            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak window] event in
+                guard let window, window.isKeyWindow, event.keyCode == 53 else { return event }
+                window.close()
+                return nil
+            }
+
             settingsWindow = window
         }
 

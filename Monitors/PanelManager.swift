@@ -25,6 +25,9 @@ class PanelManager: ObservableObject {
     func toggle() {
         if let panel, panel.isVisible {
             panel.orderOut(nil)
+            // Closed: only the menu bar's own category still needs live data. The other five
+            // monitors and the full-system process scan have nothing left to feed.
+            monitor.pauseBackground()
         } else {
             show()
         }
@@ -32,6 +35,8 @@ class PanelManager: ObservableObject {
 
     func show() {
         let panel = self.panel ?? createPanel()
+        // Every tab (and its process list) is reachable once the panel is open.
+        monitor.resumeAll()
         // Re-anchor on every open: the icon moves as neighbouring menu extras come and go.
         positionUnderStatusItem(panel)
         panel.makeKeyAndOrderFront(nil)
@@ -79,21 +84,19 @@ class PanelManager: ObservableObject {
         }
 
         let size = panel.frame.size
-        let visible = screen.visibleFrame
+        let origin = PanelPlacement.origin(
+            iconFrame: iconFrame,
+            panelSize: size,
+            visibleScreenFrame: screen.visibleFrame,
+            edgeMargin: AppTheme.Panel.screenEdgeMargin
+        )
+        panel.setFrameOrigin(origin)
 
-        let idealX = iconFrame.midX - size.width / 2
-        let minX = visible.minX + AppTheme.Panel.screenEdgeMargin
-        let maxX = visible.maxX - AppTheme.Panel.screenEdgeMargin - size.width
-        let originX = maxX >= minX ? min(max(idealX, minX), maxX) : idealX
-
-        // Sit the window's top edge flush with the bottom of the menu bar. AppKit clamps windows to
-        // the visible frame anyway, so asking for anything higher is silently overridden — the beak
-        // then hangs `topGutter` below the menu bar, which is the gap the user sees.
-        let originY = iconFrame.minY - size.height
-
-        panel.setFrameOrigin(NSPoint(x: originX, y: originY))
-
-        let limit = AppTheme.Panel.maxBeakOffset
-        anchor.beakOffsetX = min(max(iconFrame.midX - (originX + size.width / 2), -limit), limit)
+        anchor.beakOffsetX = PanelPlacement.beakOffset(
+            iconFrame: iconFrame,
+            panelOriginX: origin.x,
+            panelWidth: size.width,
+            maxOffset: AppTheme.Panel.maxBeakOffset
+        )
     }
 }

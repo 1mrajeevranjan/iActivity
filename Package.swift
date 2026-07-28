@@ -13,7 +13,7 @@ let package = Package(
         .executableTarget(
             name: "iActivity",
             path: ".",
-            exclude: [],
+            exclude: ["Tests"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
@@ -22,6 +22,11 @@ let package = Package(
                     "-Xlinker", "Info.plist"
                 ])
             ]
+        ),
+        .testTarget(
+            name: "iActivityTests",
+            dependencies: ["iActivity"],
+            path: "Tests/iActivityTests"
         )
     ]
 )
