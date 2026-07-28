@@ -19,14 +19,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var panelManager: PanelManager?
     var updateTimer: Timer?
     var onboardingWindow: NSWindow?
+    var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        panelManager = PanelManager(monitor: monitor)
-
         // Set to background accessory mode (no Dock icon)
         AppSetup.shared.setDockIconVisibility(false)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        panelManager = PanelManager(monitor: monitor, statusItem: statusItem)
 
         if let button = statusItem?.button {
             button.action = #selector(handleStatusClick)
@@ -54,6 +54,68 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 AppSetup.shared.moveToApplicationsIfNeeded()
             }
         }
+    }
+
+    func showSettings() {
+        if settingsWindow == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 420, height: 540),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.center()
+            window.isReleasedWhenClosed = false
+            window.title = "Settings"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.titlebarSeparatorStyle = .none
+            window.contentView = NSHostingView(rootView: SettingsView().environment(monitor))
+
+            // NSTitlebarAccessoryViewController is the Apple-supported way to place custom content
+            // inside the titlebar band. Everything else tried here (NSToolbarItem flexible-space,
+            // a SwiftUI row with ignoresSafeArea, an NSHostingView with Auto Layout constraints)
+            // either landed off-center, got silently occluded, or collapsed to zero width from
+            // SwiftUI's internal sizing conflicting with an externally imposed constraint.
+            //
+            // `.leading` docks the accessory's leading edge right after the traffic lights, not at
+            // the window's true left edge — so centering *within the accessory's own box* always
+            // lands right of the window's true center by roughly half the traffic-light zone's
+            // width. AppKit only reports that zone's width once the accessory is actually inserted
+            // (attempts to read window.contentLayoutGuide etc. beforehand were unreliable), so this
+            // measures it after insertion and repositions the label to compensate.
+            let titleAccessory = NSTitlebarAccessoryViewController()
+            let titleLabel = NSTextField(labelWithString: "Settings")
+            titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+            titleLabel.sizeToFit()
+            // Must have an explicit non-zero frame *before* insertion — AppKit sizes/positions the
+            // accessory from the view's own frame at that point, and a bare NSView() defaults to
+            // .zero with no intrinsic size to fall back on, which is why the first attempt at this
+            // container produced a permanently zero-width, zero-origin box.
+            let containerView = NSView(frame: NSRect(x: 0, y: 0, width: window.frame.width, height: 22))
+            containerView.addSubview(titleLabel)
+            titleAccessory.view = containerView
+            titleAccessory.layoutAttribute = .leading
+            window.addTitlebarAccessoryViewController(titleAccessory)
+
+            // AppKit lays out the newly inserted accessory asynchronously, under an internal
+            // wrapper view whose coordinate space always starts at local (0,0) regardless of where
+            // that wrapper actually sits in the titlebar — `containerView.frame.origin` reports
+            // position relative to that immediate superview, not the window, so it always read 0.
+            // Converting through the view hierarchy to window coordinates gives the real offset.
+            DispatchQueue.main.async {
+                let originInWindow = containerView.convert(NSPoint.zero, to: nil)
+                let leadingInset = originInWindow.x
+                containerView.frame = NSRect(x: containerView.frame.origin.x, y: containerView.frame.origin.y, width: window.frame.width - leadingInset, height: 22)
+                let windowCenterInAccessorySpace = window.frame.width / 2 - leadingInset
+                titleLabel.frame.origin = NSPoint(x: windowCenterInAccessorySpace - titleLabel.frame.width / 2, y: 3)
+            }
+
+            settingsWindow = window
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     func showOnboarding() {
@@ -143,7 +205,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 string: tempStr + " ",
                 attributes: [
                     .font: numberFont,
-                    .foregroundColor: NSColor.secondaryLabelColor
+                    // labelColor, not secondaryLabelColor — the dimmer secondary tone reads as
+                    // near-invisible against the menu bar's translucent, wallpaper-varying backdrop.
+                    .foregroundColor: NSColor.labelColor
                 ]
             )
             finalString.append(tempAttr)
@@ -170,6 +234,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Temperature string per category
 
     private func temperatureString(for category: MetricCategory) -> String {
+        guard UserDefaults.standard.object(forKey: "showTemperature") as? Bool ?? true else { return "" }
+
         let temp: Double
         switch category {
         case .cpu:
@@ -186,7 +252,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return "" // No temperature sensor for network
         }
         guard temp > 0 else { return "" }
-        return String(format: "%.0f°", temp)
+        let unit = TemperatureUnit(rawValue: UserDefaults.standard.string(forKey: "temperatureUnit") ?? "") ?? .celsius
+        return unit.string(fromCelsius: temp, decimals: 0)
     }
 
     private func formatSpeed(_ bytesPerSecond: Double) -> String {
@@ -205,20 +272,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let menu = NSMenu()
             menu.autoenablesItems = false
 
-            let dashboardItem = NSMenuItem(title: "Open iActivity Dashboard", action: #selector(openDashboard), keyEquivalent: "o")
-            dashboardItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
-            dashboardItem.target = self
-            menu.addItem(dashboardItem)
-
-            let themeItem = NSMenuItem(title: "Toggle Appearance", action: #selector(toggleTheme), keyEquivalent: "t")
-            themeItem.image = NSImage(systemSymbolName: "circle.lefthalf.filled", accessibilityDescription: nil)
-            themeItem.target = self
-            menu.addItem(themeItem)
-
-            let setupItem = NSMenuItem(title: "Setup & Permissions...", action: #selector(openSetup), keyEquivalent: "s")
-            setupItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
-            setupItem.target = self
-            menu.addItem(setupItem)
+            let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+            settingsItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
+            settingsItem.target = self
+            menu.addItem(settingsItem)
 
             menu.addItem(NSMenuItem.separator())
 
@@ -238,16 +295,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc func openDashboard() {
-        panelManager?.show()
-    }
-
-    @objc func toggleTheme() {
-        let current = UserDefaults.standard.bool(forKey: "isDarkMode")
-        UserDefaults.standard.set(!current, forKey: "isDarkMode")
-    }
-
-    @objc func openSetup() {
-        showOnboarding()
+    @objc func openSettings() {
+        showSettings()
     }
 }

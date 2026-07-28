@@ -2,46 +2,44 @@ import SwiftUI
 
 struct GPUView: View {
     @Environment(SystemMonitor.self) private var monitor
+    @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
+
+    private var tint: Color { AppTheme.Colors.accentColor(for: .gpu) }
 
     var body: some View {
         VStack(spacing: AppTheme.Spacing.medium) {
-            HStack(spacing: AppTheme.Spacing.medium) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
                 CircularGauge(
                     value: monitor.gpu.utilization,
                     title: "GPU",
                     unit: "\(Int(monitor.gpu.utilization * 100))%",
                     gradient: AppTheme.Colors.gpuGradient
                 )
-                .vibrantCard(padding: AppTheme.Spacing.large)
+                .glassTile(padding: AppTheme.Spacing.large, tint: tint)
 
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                    Text("Details")
-                        .font(.headline)
-
-                    DetailRow(label: "VRAM", value: formatBytes(monitor.gpu.vramTotal))
-                    DetailRow(label: "Temp", value: String(format: "%.1f°C", monitor.gpu.temperature))
-                    DetailRow(label: "Status", value: monitor.gpu.utilization > 0.8 ? "High Load" : "Normal")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .vibrantCard()
+                StatTileGrid(tiles: [
+                    ("thermometer.medium", "Temp", temperatureUnit.string(fromCelsius: monitor.gpu.temperature)),
+                    ("memorychip", "VRAM", monitor.gpu.vramTotal > 0 ? formatBytes(monitor.gpu.vramTotal) : "Unified"),
+                    ("bolt.fill", "Status", monitor.gpu.utilization > 0.8 ? "High Load" : "Normal"),
+                ], tint: tint)
+                .frame(maxWidth: .infinity)
             }
 
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Utilization History")
-                    .font(.headline)
+            StatTile(icon: "square.grid.3x1.below.line.grid.1x2", label: "Renderer", value: monitor.gpu.rendererName, tint: tint)
 
-                MiniHistoryChart(
-                    data: monitor.gpu.history,
-                    gradient: AppTheme.Colors.gpuGradient
-                )
-            }
-            .vibrantCard()
+            ChartCard(
+                title: "Utilization History",
+                value: "\(Int(monitor.gpu.utilization * 100))%",
+                data: monitor.gpu.history,
+                gradient: AppTheme.Colors.gpuGradient,
+                tint: tint
+            )
 
             TopProcessesView(
                 title: "Top GPU Processes",
                 processes: monitor.processes.topByCPU,
                 metric: .cpu,
-                color: AppTheme.Colors.accentColor(for: .gpu)
+                color: tint
             )
         }
     }

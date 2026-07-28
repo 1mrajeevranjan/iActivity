@@ -13,6 +13,7 @@ class CPUMonitor {
     private var timer: Timer?
     private var previousInfo: processor_info_array_t?
     private var previousCount: mach_msg_type_number_t = 0
+    private var currentInterval: TimeInterval = 2.0
     
     init() {
         var size = 0
@@ -23,9 +24,10 @@ class CPUMonitor {
         self.modelName = brandString.trimmingCharacters(in: .controlCharacters)
     }
     
-    func start() {
+    func start(interval: TimeInterval? = nil) {
         stop()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        if let interval { currentInterval = interval }
+        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.update()
             }

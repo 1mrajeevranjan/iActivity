@@ -61,11 +61,13 @@ struct OnboardingView: View {
                     .cornerRadius(12)
             }
             .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
             .padding(.horizontal, 30)
             .padding(.bottom, 30)
         }
         .frame(width: 400, height: 500)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 16))
+        .onExitCommand { dismiss() }
     }
 }
 
@@ -95,6 +97,8 @@ struct OptionRow: View {
             Toggle("", isOn: $isOn)
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .accessibilityLabel(Text(title))
+                .accessibilityHint(Text(subtitle))
         }
         .padding(12)
         .background(Color.primary.opacity(0.05))

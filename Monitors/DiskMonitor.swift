@@ -19,11 +19,12 @@ class DiskMonitor {
     private var lastReadBytes: Int64 = 0
     private var lastWriteBytes: Int64 = 0
     private var lastUpdate: Date = Date()
+    private var currentInterval: TimeInterval = 1.0
 
-    func start() {
+    func start(interval: TimeInterval? = nil) {
         stop()
-        // Faster update for smooth graphs
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        if let interval { currentInterval = interval }
+        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.update()
             }

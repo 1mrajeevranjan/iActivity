@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import IOKit
+import Metal
 
 @MainActor
 @Observable
@@ -10,12 +11,21 @@ class GPUMonitor {
     var vramTotal: Int64 = 0
     var history: [Double] = Array(repeating: 0, count: 60)
     var temperature: Double = 0
+    var rendererName: String = "Apple GPU"
 
     private var timer: Timer?
+    private var currentInterval: TimeInterval = 2.0
 
-    func start() {
+    init() {
+        if let device = MTLCreateSystemDefaultDevice() {
+            rendererName = device.name
+        }
+    }
+
+    func start(interval: TimeInterval? = nil) {
         stop()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        if let interval { currentInterval = interval }
+        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.update()
             }

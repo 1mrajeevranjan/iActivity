@@ -1,24 +1,30 @@
 import SwiftUI
 
-struct VibrantDarkCard: ViewModifier {
+struct GlassTile: ViewModifier {
     var radius: CGFloat
     var padding: CGFloat
-    
-    @Environment(\.colorScheme) var colorScheme
-    
+    var tint: Color
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private var isTinted: Bool { tint != .clear }
+
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .background {
                 ZStack {
-                    AppTheme.Colors.cardBackground
-                    
-                    // Subtle mesh-like gradient for depth
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(reduceTransparency ? AnyShapeStyle(AppTheme.Colors.cardBackground) : AnyShapeStyle(.ultraThinMaterial))
+
+                    if isTinted {
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(tint.opacity(colorScheme == .dark ? 0.12 : 0.07))
+                    }
+
                     LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.2),
-                            Color.clear
-                        ],
+                        colors: [Color.white.opacity(colorScheme == .dark ? 0.05 : 0.25), Color.clear],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -29,28 +35,25 @@ struct VibrantDarkCard: ViewModifier {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.15 : 0.4),
-                                Color.white.opacity(colorScheme == .dark ? 0.02 : 0.1),
-                                Color.white.opacity(colorScheme == .dark ? 0.05 : 0.2)
-                            ],
+                            colors: isTinted
+                                ? [tint.opacity(0.55), tint.opacity(0.08)]
+                                : [Color.white.opacity(colorScheme == .dark ? 0.16 : 0.45), Color.white.opacity(0.04)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 0.8
+                        lineWidth: 1
                     )
             }
-            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 12, x: 0, y: 6)
+            .shadow(
+                color: (isTinted ? tint : .black).opacity(colorScheme == .dark ? (isTinted ? 0.28 : 0.32) : (isTinted ? 0.16 : 0.08)),
+                radius: 14, x: 0, y: 8
+            )
     }
 }
 
 extension View {
-    func vibrantCard(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium) -> some View {
-        self.modifier(VibrantDarkCard(radius: radius, padding: padding))
-    }
-    
-    // Alias for compatibility during transition
-    func liquidGlass(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium) -> some View {
-        self.vibrantCard(radius: radius, padding: padding)
+    /// Single card shape used across the whole dashboard — frosted glass with an optional category-tinted glow border.
+    func glassTile(radius: CGFloat = AppTheme.Radius.card, padding: CGFloat = AppTheme.Spacing.medium, tint: Color = .clear) -> some View {
+        modifier(GlassTile(radius: radius, padding: padding, tint: tint))
     }
 }

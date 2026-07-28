@@ -2,85 +2,50 @@ import SwiftUI
 
 struct NetworkView: View {
     @Environment(SystemMonitor.self) private var monitor
-    
+
+    private var tint: Color { AppTheme.Colors.accentColor(for: .network) }
+
     var body: some View {
         VStack(spacing: AppTheme.Spacing.medium) {
+            StatTileGrid(tiles: [
+                ("arrow.down.circle.fill", "Download", formatSpeed(monitor.network.downloadSpeed)),
+                ("arrow.up.circle.fill", "Upload", formatSpeed(monitor.network.uploadSpeed)),
+                ("arrow.down.to.line.circle", "Peak Down", formatSpeed(monitor.network.downloadHistory.max() ?? 0)),
+                ("arrow.up.to.line.circle", "Peak Up", formatSpeed(monitor.network.uploadHistory.max() ?? 0)),
+            ], tint: tint)
+
+            ChartCard(
+                title: "Download",
+                value: formatSpeed(monitor.network.downloadSpeed),
+                data: monitor.network.downloadHistory,
+                gradient: Gradient(colors: [.blue, .cyan]),
+                tint: .blue,
+                height: 60
+            )
+
+            ChartCard(
+                title: "Upload",
+                value: formatSpeed(monitor.network.uploadSpeed),
+                data: monitor.network.uploadHistory,
+                gradient: Gradient(colors: [AppTheme.Colors.batteryGreen, .mint]),
+                tint: AppTheme.Colors.batteryGreen,
+                height: 60
+            )
+
             HStack(spacing: AppTheme.Spacing.medium) {
-                SpeedIndicator(label: "Download", speed: monitor.network.downloadSpeed, color: .blue, icon: "arrow.down.circle.fill")
-                    .vibrantCard()
-                SpeedIndicator(label: "Upload", speed: monitor.network.uploadSpeed, color: AppTheme.Colors.batteryGreen, icon: "arrow.up.circle.fill")
-                    .vibrantCard()
+                StatTile(icon: "wifi", label: "Interface", value: monitor.network.primaryInterfaceName, tint: tint)
+                StatTile(icon: monitor.network.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill", label: "Status", value: monitor.network.isConnected ? "Connected" : "Offline", tint: monitor.network.isConnected ? AppTheme.Colors.batteryGreen : .red)
             }
-            
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Traffic History")
-                    .font(.headline)
-                
-                VStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Download").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
-                        MiniHistoryChart(data: normalize(monitor.network.downloadHistory), gradient: Gradient(colors: [.blue, .cyan]))
-                            .frame(height: 50)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Upload").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
-                        MiniHistoryChart(data: normalize(monitor.network.uploadHistory), gradient: Gradient(colors: [AppTheme.Colors.batteryGreen, .mint]))
-                            .frame(height: 50)
-                    }
-                }
-            }
-            .vibrantCard()
-            
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Connection")
-                    .font(.headline)
-                
-                DetailRow(label: "Interface", value: "Wi-Fi (en0)")
-                DetailRow(label: "Status", value: "Connected")
-            }
-            .vibrantCard()
-            
+
             TopProcessesView(
                 title: "Most Active Processes",
                 processes: monitor.processes.topByCPU,
                 metric: .cpu,
-                color: AppTheme.Colors.accentColor(for: .network)
+                color: tint
             )
         }
     }
-    
-    private func normalize(_ data: [Double]) -> [Double] {
-        let maxVal = data.max() ?? 1.0
-        if maxVal == 0 { return data }
-        return data.map { $0 / maxVal }
-    }
-}
 
-struct SpeedIndicator: View {
-    let label: String
-    let speed: Double
-    let color: Color
-    let icon: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                    .font(.system(size: 12, weight: .bold))
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-            
-            Text(formatSpeed(speed))
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
     private func formatSpeed(_ bytesPerSecond: Double) -> String {
         if bytesPerSecond >= 1_000_000 {
             return String(format: "%.1f MB/s", bytesPerSecond / 1_000_000)

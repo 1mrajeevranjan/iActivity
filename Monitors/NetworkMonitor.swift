@@ -8,15 +8,19 @@ class NetworkMonitor {
     var uploadSpeed: Double = 0   // Bytes per second
     var downloadHistory: [Double] = Array(repeating: 0, count: 60)
     var uploadHistory: [Double] = Array(repeating: 0, count: 60)
+    var primaryInterfaceName: String = "—"
+    var isConnected: Bool = false
     
     private var lastInBytes: UInt64 = 0
     private var lastOutBytes: UInt64 = 0
     private var lastTime: Date = Date()
     private var timer: Timer?
-    
-    func start() {
+    private var currentInterval: TimeInterval = 1.0
+
+    func start(interval: TimeInterval? = nil) {
         stop()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        if let interval { currentInterval = interval }
+        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.update()
             }
@@ -36,23 +40,29 @@ class NetworkMonitor {
         
         var totalInBytes: UInt64 = 0
         var totalOutBytes: UInt64 = 0
-        
+        var primaryName: String?
+
         var ptr = ifaddr
         while ptr != nil {
             let interface = ptr!.pointee
             let flags = Int32(interface.ifa_flags)
-            // let name = String(cString: interface.ifa_name) // Removed unused variable
-            
+
             // Check for EN0 (Wi-Fi on Mac) or other active interfaces, excluding loopback
             if (flags & IFF_UP) != 0 && (flags & IFF_LOOPBACK) == 0 {
                 if let data = interface.ifa_data {
                     let ifData = data.assumingMemoryBound(to: if_data.self)
                     totalInBytes += UInt64(ifData.pointee.ifi_ibytes)
                     totalOutBytes += UInt64(ifData.pointee.ifi_obytes)
+                    if primaryName == nil {
+                        primaryName = String(cString: interface.ifa_name)
+                    }
                 }
             }
             ptr = interface.ifa_next
         }
+
+        self.primaryInterfaceName = primaryName ?? "—"
+        self.isConnected = primaryName != nil
         
         let now = Date()
         let interval = now.timeIntervalSince(lastTime)

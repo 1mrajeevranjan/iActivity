@@ -20,10 +20,12 @@ class BatteryMonitor {
     var cycleCount: Int = 0
 
     private var timer: Timer?
+    private var currentInterval: TimeInterval = 5.0
 
-    func start() {
+    func start(interval: TimeInterval? = nil) {
         stop()
-        timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        if let interval { currentInterval = interval }
+        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.update()
             }

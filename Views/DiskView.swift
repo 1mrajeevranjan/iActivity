@@ -2,88 +2,54 @@ import SwiftUI
 
 struct DiskView: View {
     @Environment(SystemMonitor.self) private var monitor
-    
+    @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
+
+    private var tint: Color { AppTheme.Colors.accentColor(for: .disk) }
+
     var body: some View {
         VStack(spacing: AppTheme.Spacing.medium) {
-            HStack(spacing: AppTheme.Spacing.medium) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
                 CircularGauge(
                     value: monitor.disk.usagePercentage,
                     title: "Storage",
                     unit: "\(Int(monitor.disk.usagePercentage * 100))%",
                     gradient: AppTheme.Colors.diskGradient
                 )
-                .vibrantCard(padding: AppTheme.Spacing.large)
-                
-                VStack(spacing: AppTheme.Spacing.small) {
-                    LiquidDetailCard(
-                        icon: "internaldrive",
-                        label: "Capacity",
-                        value: formatBytes(monitor.disk.total),
-                        color: AppTheme.Colors.accentColor(for: .disk)
-                    )
+                .glassTile(padding: AppTheme.Spacing.large, tint: tint)
 
-                    LiquidDetailCard(
-                        icon: "thermometer.medium",
-                        label: "Temp",
-                        value: String(format: "%.1f°C", monitor.disk.temperature),
-                        color: .orange
-                    )
-                }
+                StatTileGrid(tiles: [
+                    ("internaldrive", "Size", formatBytes(monitor.disk.total)),
+                    ("thermometer.medium", "Temp", temperatureUnit.string(fromCelsius: monitor.disk.temperature)),
+                    ("externaldrive.badge.checkmark", "Free", formatBytes(monitor.disk.free)),
+                    ("checkmark.shield.fill", "Status", "Healthy"),
+                ], tint: tint)
+                .frame(maxWidth: .infinity)
             }
-            
+
             HStack(spacing: AppTheme.Spacing.medium) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundColor(.blue)
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Read Speed")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
-                    }
-                    Text(formatBitrate(monitor.disk.readSpeed))
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                    MiniHistoryChart(data: monitor.disk.readHistory, gradient: Gradient(colors: [.blue, .cyan]))
-                        .frame(height: 50)
-                }
-                .vibrantCard()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .foregroundColor(.purple)
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Write Speed")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
-                    }
-                    Text(formatBitrate(monitor.disk.writeSpeed))
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                    MiniHistoryChart(data: monitor.disk.writeHistory, gradient: Gradient(colors: [.purple, .pink]))
-                        .frame(height: 50)
-                }
-                .vibrantCard()
+                ChartCard(
+                    title: "Read Speed",
+                    value: formatBitrate(monitor.disk.readSpeed),
+                    data: monitor.disk.readHistory,
+                    gradient: Gradient(colors: [.blue, .cyan]),
+                    tint: .blue,
+                    height: 60
+                )
+                ChartCard(
+                    title: "Write Speed",
+                    value: formatBitrate(monitor.disk.writeSpeed),
+                    data: monitor.disk.writeHistory,
+                    gradient: Gradient(colors: [.purple, .pink]),
+                    tint: .purple,
+                    height: 60
+                )
             }
-            
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Disk Status")
-                    .font(.headline)
-                
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.shield.fill")
-                        .foregroundStyle(AppTheme.Colors.batteryGreen)
-                    Text("S.M.A.R.T. Status: Healthy")
-                        .font(.system(size: 14, weight: .medium))
-                    Spacer()
-                }
-            }
-            .vibrantCard()
-            
+
             TopProcessesView(
                 title: "Most Active Processes",
                 processes: monitor.processes.topByCPU,
                 metric: .cpu,
-                color: AppTheme.Colors.accentColor(for: .disk)
+                color: tint
             )
         }
     }
@@ -92,7 +58,11 @@ struct DiskView: View {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useGB, .useTB]
         formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
+        formatter.isAdaptive = false
+        let raw = formatter.string(fromByteCount: bytes)
+        // Round to a whole number so it always fits the tile ("494 GB", not "494.38…").
+        guard let dotIndex = raw.firstIndex(of: "."), let unitStart = raw.firstIndex(of: " ") else { return raw }
+        return String(raw[raw.startIndex..<dotIndex]) + String(raw[unitStart...])
     }
 
     private func formatBitrate(_ bytesPerSecond: Double) -> String {

@@ -19,6 +19,7 @@ class MemoryMonitor {
     }
 
     private var timer: Timer?
+    private var currentInterval: TimeInterval = 2.0
 
     init() {
         var memSize: Int64 = 0
@@ -27,9 +28,10 @@ class MemoryMonitor {
         self.total = Double(memSize)
     }
 
-    func start() {
+    func start(interval: TimeInterval? = nil) {
         stop()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        if let interval { currentInterval = interval }
+        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.update()
             }

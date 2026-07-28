@@ -2,86 +2,64 @@ import SwiftUI
 
 struct MemoryView: View {
     @Environment(SystemMonitor.self) private var monitor
-    
+    @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
+
+    private var tint: Color { AppTheme.Colors.accentColor(for: .memory) }
+
     var body: some View {
         VStack(spacing: AppTheme.Spacing.medium) {
-            HStack(spacing: AppTheme.Spacing.medium) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
                 CircularGauge(
                     value: monitor.memory.usagePercentage,
                     title: "Memory",
                     unit: "\(Int(monitor.memory.usagePercentage * 100))%",
                     gradient: AppTheme.Colors.memGradient
                 )
-                .vibrantCard(padding: AppTheme.Spacing.large)
-                
-                VStack(spacing: AppTheme.Spacing.small) {
-                    LiquidDetailCard(
-                        icon: "memorychip",
-                        label: "Usage",
-                        value: "\(Int(monitor.memory.usagePercentage * 100))%",
-                        color: AppTheme.Colors.accentColor(for: .memory)
-                    )
+                .glassTile(padding: AppTheme.Spacing.large, tint: tint)
 
-                    LiquidDetailCard(
-                        icon: "thermometer.medium",
-                        label: "Temp",
-                        value: String(format: "%.1f°C", monitor.memory.temperature),
-                        color: .orange
-                    )
-                }
+                StatTileGrid(tiles: [
+                    ("thermometer.medium", "Temp", temperatureUnit.string(fromCelsius: monitor.memory.temperature)),
+                    ("memorychip", "Total", formatBytes(Int64(monitor.memory.total))),
+                ], tint: tint)
+                .frame(maxWidth: .infinity)
             }
-            
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Usage History")
-                    .font(.headline)
-                
-                MiniHistoryChart(
-                    data: monitor.memory.usageHistory,
-                    gradient: AppTheme.Colors.memGradient
-                )
-            }
-            .vibrantCard()
-            
+
+            ChartCard(
+                title: "Usage History",
+                value: "\(Int(monitor.memory.usagePercentage * 100))%",
+                data: monitor.memory.usageHistory,
+                gradient: AppTheme.Colors.memGradient,
+                tint: tint
+            )
+
             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
                 Text("Composition")
-                    .font(.headline)
-                
-                HStack(spacing: AppTheme.Spacing.small) {
-                    CompositionItem(label: "Used", value: monitor.memory.used, total: monitor.memory.total, color: .red)
-                    CompositionItem(label: "Active", value: monitor.memory.active, total: monitor.memory.total, color: .orange)
-                    CompositionItem(label: "Compressed", value: monitor.memory.compressed, total: monitor.memory.total, color: .blue)
-                    CompositionItem(label: "Free", value: monitor.memory.free, total: monitor.memory.total, color: .green)
-                }
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.5)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.secondary)
+
+                StatTileGrid(tiles: [
+                    ("circle.fill", "Wired", formatBytes(Int64(monitor.memory.wired))),
+                    ("circle.fill", "Active", formatBytes(Int64(monitor.memory.active))),
+                    ("circle.fill", "Compressed", formatBytes(Int64(monitor.memory.compressed))),
+                    ("circle.fill", "Free", formatBytes(Int64(monitor.memory.free))),
+                ], tint: tint)
             }
-            .vibrantCard()
-            
+
             TopProcessesView(
                 title: "Top Memory Processes",
                 processes: monitor.processes.topByMemory,
                 metric: .memory,
-                color: AppTheme.Colors.accentColor(for: .memory)
+                color: tint
             )
         }
     }
-}
 
-struct CompositionItem: View {
-    let label: String
-    let value: Double
-    let total: Double
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 6, height: 6)
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-            Text("\(Int((value/total)*100))%")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB]
+        formatter.countStyle = .memory
+        return formatter.string(fromByteCount: bytes)
     }
 }

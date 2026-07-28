@@ -52,6 +52,39 @@ enum AppTheme {
         static let card: CGFloat = 14
         static let inner: CGFloat = 10
     }
+
+    /// Geometry shared between the SwiftUI dashboard and the AppKit panel that hosts it.
+    /// The window is deliberately larger than the visible card so the card's shadow can fade
+    /// out inside the window — a shadow that reaches the window edge gets clipped there and
+    /// reads as a hard rectangular outline around the popover.
+    enum Panel {
+        static let cardWidth: CGFloat = 440
+        static let cardHeight: CGFloat = 620
+        static let cornerRadius: CGFloat = 18
+
+        /// Transparent gutter on the sides and bottom that gives the shadow room to fade.
+        static let shadowMargin: CGFloat = 20
+
+        /// Gutter above the beak's tip. AppKit clamps a window's top to the menu bar, so the window
+        /// top ends up flush with it and this doubles as the gap between the menu bar and the beak.
+        /// Kept tiny so the beak reads as touching the menu bar; the card's shadow is offset
+        /// downward by a matching amount so it still fades out inside this margin.
+        static let topGutter: CGFloat = 2
+
+        /// Width of the beak's base where it meets the card.
+        static let beakWidth: CGFloat = 24
+        /// How far the beak rises above the card's top edge.
+        static let beakRise: CGFloat = 11
+
+        static var topInset: CGFloat { topGutter + beakRise }
+        static var windowWidth: CGFloat { cardWidth + shadowMargin * 2 }
+        static var windowHeight: CGFloat { cardHeight + topInset + shadowMargin }
+
+        static let screenEdgeMargin: CGFloat = 8
+
+        /// Furthest the beak may slide from centre before it would collide with a rounded corner.
+        static var maxBeakOffset: CGFloat { cardWidth / 2 - cornerRadius - beakWidth / 2 }
+    }
 }
 
 extension Color {
@@ -107,6 +140,67 @@ enum MetricCategory: String, CaseIterable, Identifiable {
         case .disk: return "DISK"
         case .battery: return "BAT"
         case .network: return "NET"
+        }
+    }
+}
+
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case light, dark, auto
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .light: return "Light"
+        case .dark: return "Dark"
+        case .auto: return "Auto"
+        }
+    }
+
+    /// nil means "follow the system appearance."
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        case .auto: return nil
+        }
+    }
+}
+
+enum TemperatureUnit: String, CaseIterable, Identifiable {
+    case celsius, fahrenheit
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .celsius: return "Celsius"
+        case .fahrenheit: return "Fahrenheit"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .celsius: return "°C"
+        case .fahrenheit: return "°F"
+        }
+    }
+
+    func string(fromCelsius celsius: Double, decimals: Int = 1) -> String {
+        let value = self == .celsius ? celsius : celsius * 9 / 5 + 32
+        return String(format: "%.\(decimals)f%@", value, shortTitle)
+    }
+}
+
+enum RefreshInterval: Double, CaseIterable, Identifiable {
+    case fast = 1.0
+    case normal = 2.0
+    case slow = 5.0
+    var id: Double { rawValue }
+
+    var title: String {
+        switch self {
+        case .fast: return "1s"
+        case .normal: return "2s"
+        case .slow: return "5s"
         }
     }
 }

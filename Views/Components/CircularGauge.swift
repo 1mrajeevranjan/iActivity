@@ -46,5 +46,8 @@ struct CircularGauge: View {
             }
         }
         .frame(width: 130, height: 130)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(unit))
     }
 }

@@ -41,7 +41,7 @@ struct TopProcessesView: View {
                                         .frame(width: 18, height: 18)
                                     Text("\(index + 1)")
                                         .font(.system(size: 9, weight: .black, design: .rounded))
-                                        .foregroundColor(color)
+                                        .foregroundStyle(.primary)
                                 }
                                 
                                 Text(process.name)
@@ -53,7 +53,7 @@ struct TopProcessesView: View {
                                 
                                 Text(metric == .cpu ? formatCPU(process.cpuPercent) : formatMemory(process.memoryMB))
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundColor(color)
+                                    .foregroundStyle(.primary)
                             }
                             .padding(.vertical, 6)
                             .padding(.horizontal, 4)
@@ -75,7 +75,7 @@ struct TopProcessesView: View {
                 }
             }
         }
-        .vibrantCard(padding: 12)
+        .glassTile(padding: 12, tint: color)
     }
     
     private func formatCPU(_ value: Double) -> String {
