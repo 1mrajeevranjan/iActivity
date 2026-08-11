@@ -16,6 +16,8 @@ class PanelManager: ObservableObject {
     private let monitor: SystemMonitor
     private let anchor = PanelAnchor()
     private weak var statusItem: NSStatusItem?
+    private var outsideClickMonitor: Any?
+    private var escKeyMonitor: Any?
 
     init(monitor: SystemMonitor, statusItem: NSStatusItem?) {
         self.monitor = monitor
@@ -24,13 +26,18 @@ class PanelManager: ObservableObject {
 
     func toggle() {
         if let panel, panel.isVisible {
-            panel.orderOut(nil)
-            // Closed: only the menu bar's own category still needs live data. The other five
-            // monitors and the full-system process scan have nothing left to feed.
-            monitor.pauseBackground()
+            close()
         } else {
             show()
         }
+    }
+
+    private func close() {
+        panel?.orderOut(nil)
+        // Closed: only the menu bar's own category still needs live data. The other five
+        // monitors and the full-system process scan have nothing left to feed.
+        monitor.pauseBackground()
+        removeDismissMonitors()
     }
 
     func show() {
@@ -41,6 +48,40 @@ class PanelManager: ObservableObject {
         positionUnderStatusItem(panel)
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        installDismissMonitors()
+    }
+
+    /// Matches native menu extras (Calendar, Control Center): the panel closes on Esc or on
+    /// any click outside it. Neither comes for free on a borderless NSPanel — only genuine
+    /// NSPopovers get that automatically — so both are wired up manually here, and torn down
+    /// on close since a leaked global monitor would keep firing (and leak) after the panel
+    /// stops existing.
+    private func installDismissMonitors() {
+        removeDismissMonitors()
+
+        escKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, let self, let panel = self.panel, panel.isVisible else { return event }
+            self.close()
+            return nil
+        }
+
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, let panel = self.panel, panel.isVisible else { return }
+            // A click on the status item button itself is already handled by its own
+            // action — closing here first would make that click immediately reopen the
+            // panel instead of just toggling it shut.
+            if let buttonWindow = self.statusItem?.button?.window, buttonWindow.frame.contains(NSEvent.mouseLocation) {
+                return
+            }
+            self.close()
+        }
+    }
+
+    private func removeDismissMonitors() {
+        if let escKeyMonitor { NSEvent.removeMonitor(escKeyMonitor) }
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        escKeyMonitor = nil
+        outsideClickMonitor = nil
     }
 
     @discardableResult

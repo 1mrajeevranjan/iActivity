@@ -71,17 +71,11 @@ class BatteryMonitor {
                     self.cycleCount = cycles
                 }
                 
-                if let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
-                   let designCapacity = description["DesignCapacity"] as? Int,
-                   designCapacity > 0 {
-                    self.healthPercentage = Double(maxCapacity) / Double(designCapacity) * 100.0
-                } else if let capacity = description[kIOPSCurrentCapacityKey] as? Int,
-                          let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
-                          maxCapacity > 0 {
-                    // fallback: show current percentage of max as proxy
-                    self.healthPercentage = Double(capacity) / Double(maxCapacity) * 100.0
-                }
-                
+                // kIOPSMaxCapacityKey/"DesignCapacity" here are already percentages (0-100),
+                // not mAh — IOPSCopyPowerSourcesInfo never exposes a real DesignCapacity key at
+                // all, so health is computed from raw AppleSmartBattery IORegistry fields below
+                // instead (AppleRawMaxCapacity / DesignCapacity, both true mAh).
+
                 // Calculate Watts
                 if let voltage = description["Voltage"] as? Int,
                    let amperage = description["Current"] as? Int {
@@ -94,12 +88,13 @@ class BatteryMonitor {
             }
         }
         
-        // Fallbacks via IORegistry if IOPS dictionary omitted details
+        // Cycle count and health always come from raw IORegistry fields — IOPS never exposes a
+        // real (mAh) DesignCapacity to compute health from.
         if self.cycleCount == 0 || self.healthPercentage == 0 {
             let props = fetchBatteryPropertiesFromIORegistry()
             if self.cycleCount == 0, let c = props.cycleCount { self.cycleCount = c }
             if self.healthPercentage == 0, let max = props.maxCapacity, let design = props.designCapacity, design > 0 {
-                self.healthPercentage = Double(max) / Double(design) * 100.0
+                self.healthPercentage = min(100.0, Double(max) / Double(design) * 100.0)
             }
         }
         
@@ -154,7 +149,9 @@ class BatteryMonitor {
                     if foundDesignCapacity == nil, let designCapacity = dict["DesignCapacity"] as? Int {
                         foundDesignCapacity = designCapacity
                     }
-                    if foundMaxCapacity == nil, let maxCapacity = dict["MaxCapacity"] as? Int {
+                    // "MaxCapacity" at this layer is percentage-shaped (0-100), not mAh — the real
+                    // mAh-scale max capacity, comparable to DesignCapacity, is AppleRawMaxCapacity.
+                    if foundMaxCapacity == nil, let maxCapacity = dict["AppleRawMaxCapacity"] as? Int {
                         foundMaxCapacity = maxCapacity
                     }
                     

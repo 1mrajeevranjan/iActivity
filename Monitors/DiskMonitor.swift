@@ -60,26 +60,26 @@ class DiskMonitor {
     private func updateIOStats() {
         var read: Int64 = 0
         var write: Int64 = 0
-        
-        let matching = IOServiceMatching("IOMedia")
+
+        // Cumulative I/O byte counters live on IOBlockStorageDriver, keyed "Bytes (Read)" /
+        // "Bytes (Write)" — not on IOMedia's "Statistics" dict, which doesn't carry those keys on
+        // Apple Silicon's NVMe storage stack (verified against `ioreg -c IOBlockStorageDriver`).
+        // Querying IOMedia here always returned nil, so read/write speed was silently stuck at 0
+        // regardless of actual disk activity.
+        let matching = IOServiceMatching("IOBlockStorageDriver")
         var iter: io_iterator_t = 0
         if IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) == kIOReturnSuccess {
             var service = IOIteratorNext(iter)
             while service != 0 {
                 var props: Unmanaged<CFMutableDictionary>?
                 if IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == kIOReturnSuccess,
-                   let dict = props?.takeRetainedValue() as? [String: Any] {
-                    
-                    // Only count stats for the whole disk to avoid double-counting partitions
-                    if let isWhole = dict["Whole"] as? Bool, isWhole {
-                        if let stats = dict["Statistics"] as? [String: Any] {
-                            if let bytesRead = stats["Bytes Read"] as? Int64 {
-                                read += bytesRead
-                            }
-                            if let bytesWritten = stats["Bytes Written"] as? Int64 {
-                                write += bytesWritten
-                            }
-                        }
+                   let dict = props?.takeRetainedValue() as? [String: Any],
+                   let stats = dict["Statistics"] as? [String: Any] {
+                    if let bytesRead = stats["Bytes (Read)"] as? Int64 {
+                        read += bytesRead
+                    }
+                    if let bytesWritten = stats["Bytes (Write)"] as? Int64 {
+                        write += bytesWritten
                     }
                 }
                 IOObjectRelease(service)

@@ -40,7 +40,11 @@ class AppSetup {
         alert.informativeText = "iActivity works best when installed in your Applications folder. This will also make it appear in Launchpad."
         alert.addButton(withTitle: "Move to Applications")
         alert.addButton(withTitle: "Stay in Downloads")
-        
+        // NSAlert only auto-binds Esc to a button titled exactly "Cancel" — neither button
+        // here qualifies, so Esc silently did nothing. Bind it explicitly to the safe,
+        // non-destructive choice.
+        alert.buttons[1].keyEquivalent = "\u{1b}"
+
         if alert.runModal() == .alertFirstButtonReturn {
             let fileManager = FileManager.default
             let targetURL = URL(fileURLWithPath: "/Applications").appendingPathComponent(URL(fileURLWithPath: bundlePath).lastPathComponent)
