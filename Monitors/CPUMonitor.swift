@@ -9,7 +9,43 @@ class CPUMonitor {
     var history: [Double] = Array(repeating: 0, count: 60)
     var temperature: Double = 0
     var modelName: String = "Apple Silicon"
-    
+
+    /// How many of the cores in `coreUsages` are efficiency cores. On Apple Silicon the kernel
+    /// reports them first, so indices `0..<efficiencyCoreCount` are E-cores and the rest are P.
+    /// Zero on Intel, where there is no split and every core is just "Core N".
+    var efficiencyCoreCount: Int = 0
+
+    /// Label and class for one core, for the expanded core list.
+    func coreKind(at index: Int) -> CoreKind {
+        guard efficiencyCoreCount > 0 else { return .undifferentiated(index) }
+        return index < efficiencyCoreCount
+            ? .efficiency(index + 1)
+            : .performance(index - efficiencyCoreCount + 1)
+    }
+
+    enum CoreKind {
+        case efficiency(Int)
+        case performance(Int)
+        case undifferentiated(Int)
+
+        var label: String {
+            switch self {
+            case .efficiency(let n): return "E-Core \(n)"
+            case .performance(let n): return "P-Core \(n)"
+            case .undifferentiated(let n): return "Core \(n)"
+            }
+        }
+
+        /// Spoken in full — VoiceOver reads "E-Core" as the letter E.
+        var spokenLabel: String {
+            switch self {
+            case .efficiency(let n): return "Efficiency core \(n)"
+            case .performance(let n): return "Performance core \(n)"
+            case .undifferentiated(let n): return "Core \(n)"
+            }
+        }
+    }
+
     private var timer: Timer?
     private var previousInfo: processor_info_array_t?
     private var previousCount: mach_msg_type_number_t = 0
@@ -22,6 +58,17 @@ class CPUMonitor {
         sysctlbyname("machdep.cpu.brand_string", &brand, &size, nil, 0)
         let brandString = brand.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
         self.modelName = brandString.trimmingCharacters(in: .controlCharacters)
+
+        // perflevel0 is the Performance cluster, perflevel1 the Efficiency one. Both keys are
+        // absent on Intel, where the count stays zero and the cores go unlabelled.
+        self.efficiencyCoreCount = Self.sysctlInt("hw.perflevel1.logicalcpu") ?? 0
+    }
+
+    private static func sysctlInt(_ name: String) -> Int? {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+        return Int(value)
     }
     
     func start(interval: TimeInterval? = nil) {

@@ -14,6 +14,16 @@ struct iActivityApp: App {
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    /// `NSApp.delegate as? AppDelegate` returns nil under `@NSApplicationDelegateAdaptor` —
+    /// SwiftUI does not leave this instance there, so every call through it is a silent no-op.
+    /// Hold an explicit reference instead (design-system § 14).
+    private(set) static var shared: AppDelegate?
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
     var statusItem: NSStatusItem?
     var monitor = SystemMonitor()
     var panelManager: PanelManager?
@@ -60,7 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 420, height: 540),
-                styleMask: [.titled, .closable],
+                styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
             )
@@ -70,7 +80,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.titlebarSeparatorStyle = .none
-            window.contentView = NSHostingView(rootView: SettingsView().environment(monitor))
+            // `sizingOptions = []` keeps the hosting view from re-sizing the window to fit its
+            // content: a grouped `Form` wraps itself in a ScrollView with no definite ideal
+            // height, so the chrome jumps around as sections change.
+            let hosting = NSHostingView(rootView: SettingsView().environment(monitor))
+            hosting.sizingOptions = []
+            window.contentView = hosting
 
             // NSTitlebarAccessoryViewController is the Apple-supported way to place custom content
             // inside the titlebar band. Everything else tried here (NSToolbarItem flexible-space,
@@ -129,7 +144,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showOnboarding() {
         if onboardingWindow == nil {
-            let contentView = OnboardingView()
+            let contentView = OnboardingView { [weak self] in
+                self?.onboardingWindow?.close()
+            }
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
                 styleMask: [.titled, .closable, .fullSizeContentView],

@@ -8,6 +8,15 @@ import AppKit
 @Observable
 final class PanelAnchor {
     var beakOffsetX: CGFloat = 0
+
+    /// Screen-derived ceiling for the popover's total height, set by `PanelManager` on every
+    /// open. Content taller than this scrolls instead of running off the display.
+    var maxCardHeight: CGFloat = 0
+
+    /// Reported by `MainDashboardView` once its content lays out, so the panel can grow or
+    /// shrink to fit whatever the current tab actually has to show. Same bridge role as
+    /// `beakOffsetX` — this object is the one thing both SwiftUI and `PanelManager` hold.
+    var onContentHeightChange: ((CGFloat) -> Void)?
 }
 
 @MainActor
@@ -60,9 +69,19 @@ class PanelManager: ObservableObject {
         removeDismissMonitors()
 
         escKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53, let self, let panel = self.panel, panel.isVisible else { return event }
-            self.close()
-            return nil
+            guard let self, let panel = self.panel, panel.isVisible else { return event }
+
+            if event.keyCode == 53 {  // Esc
+                self.close()
+                return nil
+            }
+
+            if let category = Self.categoryForKey(event) {
+                NotificationCenter.default.post(name: .selectMetricCategory, object: category.rawValue)
+                return nil
+            }
+
+            return event
         }
 
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
@@ -74,6 +93,29 @@ class PanelManager: ObservableObject {
                 return
             }
             self.close()
+        }
+    }
+
+    /// ← / → step through the categories, ⌘1–⌘6 jump straight to one. Up/Down are deliberately
+    /// left alone so they still scroll the pane (HIG § 5.7). This has to be decoded by hand:
+    /// SwiftUI's `.keyboardShortcut` needs the key window's command chain, which a borderless
+    /// panel hosting an `NSHostingView` never gets.
+    private static func categoryForKey(_ event: NSEvent) -> MetricCategory? {
+        let currentRaw = UserDefaults.standard.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
+        let current = MetricCategory(rawValue: currentRaw) ?? .cpu
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        if flags == .command {
+            guard let digit = Int(event.charactersIgnoringModifiers ?? "") else { return nil }
+            return MetricCategory.at(oneBasedIndex: digit)
+        }
+
+        guard flags.isEmpty else { return nil }
+        switch event.keyCode {
+        case 123: return .stepping(from: current, by: -1)  // left arrow
+        case 124: return .stepping(from: current, by: 1)   // right arrow
+        default: return nil
         }
     }
 
@@ -111,7 +153,28 @@ class PanelManager: ObservableObject {
         newPanel.contentView = NSHostingView(rootView: contentView)
 
         self.panel = newPanel
+
+        anchor.onContentHeightChange = { [weak self, weak newPanel] height in
+            guard let self, let panel = newPanel else { return }
+            self.resizeToFitContent(panel, contentHeight: height)
+        }
+
         return newPanel
+    }
+
+    /// Grows or shrinks the panel to the current tab's actual content height, keeping the top
+    /// edge (and the beak) fixed under the menu bar icon — only the bottom moves.
+    /// `MainDashboardView` already clamps what it reports to `anchor.maxCardHeight`, so this
+    /// never has to fit anything taller than the screen.
+    private func resizeToFitContent(_ panel: NSPanel, contentHeight: CGFloat) {
+        let newHeight = contentHeight + AppTheme.Panel.topGutter + AppTheme.Panel.shadowMargin
+        var frame = panel.frame
+        guard abs(frame.height - newHeight) > 0.5 else { return }
+
+        frame.origin.y += frame.height - newHeight
+        frame.size.height = newHeight
+        let animate = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        panel.setFrame(frame, display: true, animate: animate)
     }
 
     /// Centres the card under the menu bar icon, clamped to the screen, and reports how far
@@ -132,6 +195,9 @@ class PanelManager: ObservableObject {
             edgeMargin: AppTheme.Panel.screenEdgeMargin
         )
         panel.setFrameOrigin(origin)
+
+        anchor.maxCardHeight = screen.visibleFrame.height
+            - AppTheme.Panel.topGutter - AppTheme.Panel.shadowMargin - AppTheme.Panel.screenEdgeMargin * 2
 
         anchor.beakOffsetX = PanelPlacement.beakOffset(
             iconFrame: iconFrame,

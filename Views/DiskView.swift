@@ -7,50 +7,51 @@ struct DiskView: View {
     private var tint: Color { AppTheme.Colors.accentColor(for: .disk) }
 
     var body: some View {
-        VStack(spacing: AppTheme.Spacing.medium) {
-            HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
-                CircularGauge(
-                    value: monitor.disk.usagePercentage,
-                    title: "Storage",
-                    unit: "\(Int(monitor.disk.usagePercentage * 100))%",
-                    gradient: AppTheme.Colors.diskGradient
-                )
-                .glassTile(padding: AppTheme.Spacing.large, tint: tint)
+        VStack(spacing: AppTheme.Metrics.groupSpacing) {
+            StatTileRow(tiles: [
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.disk.temperature, decimals: 0)),
+                .init(icon: "internaldrive", label: "Size", value: formatBytes(monitor.disk.total)),
+                .init(icon: "tray.fill", label: "Free", value: formatBytes(monitor.disk.free)),
+            ], tint: tint)
 
-                StatTileGrid(tiles: [
-                    ("internaldrive", "Size", formatBytes(monitor.disk.total)),
-                    ("thermometer.medium", "Temp", temperatureUnit.string(fromCelsius: monitor.disk.temperature)),
-                    ("externaldrive.badge.checkmark", "Free", formatBytes(monitor.disk.free)),
-                    ("checkmark.shield.fill", "Status", "Healthy"),
-                ], tint: tint)
-                .frame(maxWidth: .infinity)
+            CardDivider()
+
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Storage")
+                MetricRow(
+                    label: "Used",
+                    value: "\(Int(monitor.disk.usagePercentage * 100))%",
+                    fraction: monitor.disk.usagePercentage,
+                    tint: tint
+                )
             }
 
-            HStack(spacing: AppTheme.Spacing.medium) {
-                ChartCard(
-                    title: "Read Speed",
+            CardDivider()
+
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Activity")
+                MetricRow(
+                    label: "Read",
                     value: formatBitrate(monitor.disk.readSpeed),
-                    data: monitor.disk.readHistory,
-                    gradient: Gradient(colors: [.blue, .cyan]),
-                    tint: .blue,
-                    height: 60
+                    tint: AppTheme.Colors.brandBlue,
+                    icon: "arrow.down",
+                    history: monitor.disk.readHistory
                 )
-                ChartCard(
-                    title: "Write Speed",
+                MetricRow(
+                    label: "Write",
                     value: formatBitrate(monitor.disk.writeSpeed),
-                    data: monitor.disk.writeHistory,
-                    gradient: Gradient(colors: [.purple, .pink]),
                     tint: .purple,
-                    height: 60
+                    icon: "arrow.up",
+                    history: monitor.disk.writeHistory
                 )
             }
 
-            TopProcessesView(
-                title: "Most Active Processes",
-                processes: monitor.processes.topByCPU,
-                metric: .cpu,
-                color: tint
-            )
+            CardDivider()
+
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Most active processes")
+                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+            }
         }
     }
 
@@ -59,6 +60,7 @@ struct DiskView: View {
         formatter.allowedUnits = [.useGB, .useTB]
         formatter.countStyle = .file
         formatter.isAdaptive = false
+        formatter.allowsNonnumericFormatting = false
         let raw = formatter.string(fromByteCount: bytes)
         // Round to a whole number so it always fits the tile ("494 GB", not "494.38…").
         guard let dotIndex = raw.firstIndex(of: "."), let unitStart = raw.firstIndex(of: " ") else { return raw }
@@ -71,7 +73,7 @@ struct DiskView: View {
         } else if bytesPerSecond >= 1_000_000 {
             return String(format: "%.1f MB/s", bytesPerSecond / 1_000_000)
         } else if bytesPerSecond >= 1_000 {
-            return String(format: "%.1f KB/s", bytesPerSecond / 1_000)
+            return String(format: "%.0f KB/s", bytesPerSecond / 1_000)
         } else {
             return String(format: "%.0f B/s", bytesPerSecond)
         }

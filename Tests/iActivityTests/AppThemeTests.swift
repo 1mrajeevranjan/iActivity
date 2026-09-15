@@ -58,3 +58,33 @@ struct RefreshIntervalTests {
         }
     }
 }
+
+struct CategoryKeyboardNavigationTests {
+    @Test("Right arrow advances one tab, left arrow goes back one")
+    func steppingMovesOneTab() {
+        #expect(MetricCategory.stepping(from: .cpu, by: 1) == .gpu)
+        #expect(MetricCategory.stepping(from: .gpu, by: -1) == .cpu)
+    }
+
+    @Test("Stepping wraps at both ends so the tab bar has no dead edges")
+    func steppingWraps() {
+        #expect(MetricCategory.stepping(from: .cpu, by: -1) == .network)
+        #expect(MetricCategory.stepping(from: .network, by: 1) == .cpu)
+    }
+
+    @Test("Command-N maps to the Nth tab, one-based, and nothing outside that range")
+    func commandDigitSelectsNthTab() {
+        #expect(MetricCategory.at(oneBasedIndex: 1) == .cpu)
+        #expect(MetricCategory.at(oneBasedIndex: 6) == .network)
+        #expect(MetricCategory.at(oneBasedIndex: 0) == nil)
+        #expect(MetricCategory.at(oneBasedIndex: 7) == nil)
+    }
+
+    @Test("Display names are unique and read as prose, not as the all-caps tab labels")
+    func displayNamesAreDistinct() {
+        let names = MetricCategory.allCases.map(\.displayName)
+        #expect(Set(names).count == names.count)
+        #expect(MetricCategory.memory.displayName == "Memory")
+        #expect(MetricCategory.battery.displayName == "Battery")
+    }
+}

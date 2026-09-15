@@ -17,15 +17,23 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, newValue in
-                        AppSetup.shared.isLaunchAtLoginEnabled = newValue
-                    }
+                SubtitleToggle(
+                    title: "Launch at Login",
+                    subtitle: "Start iActivity automatically after you sign in.",
+                    isOn: $launchAtLogin
+                )
+                .onChange(of: launchAtLogin) { _, newValue in
+                    AppSetup.shared.isLaunchAtLoginEnabled = newValue
+                }
 
-                Toggle("Show Dock Icon", isOn: $showInDock)
-                    .onChange(of: showInDock) { _, newValue in
-                        AppSetup.shared.setDockIconVisibility(newValue)
-                    }
+                SubtitleToggle(
+                    title: "Show Dock Icon",
+                    subtitle: "iActivity normally lives only in the menu bar.",
+                    isOn: $showInDock
+                )
+                .onChange(of: showInDock) { _, newValue in
+                    AppSetup.shared.setDockIconVisibility(newValue)
+                }
             } header: {
                 Text("General")
             }
@@ -50,12 +58,18 @@ struct SettingsView: View {
 
             Section {
                 Picker("Menu Bar Shows", selection: $menuBarCategory) {
+                    // `displayName`, not the all-caps `title` — a menu is prose, and VoiceOver
+                    // spells "MEMORY" out when it is shouted at it.
                     ForEach(MetricCategory.allCases) { category in
-                        Text(category.title).tag(category)
+                        Text(category.displayName).tag(category)
                     }
                 }
 
-                Toggle("Show Temperature", isOn: $showTemperature)
+                SubtitleToggle(
+                    title: "Show Temperature",
+                    subtitle: "Display the sensor reading beside the menu bar value.",
+                    isOn: $showTemperature
+                )
 
                 Picker("Update Every", selection: $updateInterval) {
                     ForEach(RefreshInterval.allCases) { rate in
@@ -67,18 +81,27 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("Monitoring")
+            } footer: {
+                Text("A slower interval uses less power. The dashboard's other categories pause entirely while it is closed.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
-                Button(role: .destructive) {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    Label("Quit iActivity", systemImage: "power")
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity)
+                // Standard bordered button with a destructive role — the previous `.plain` style
+                // with a hand-applied red fill matched nothing else in macOS and lost its pressed
+                // and disabled states.
+                HStack {
+                    Spacer()
+                    Button("Quit iActivity", role: .destructive) {
+                        NSApplication.shared.terminate(nil)
+                    }
+                    .controlSize(.large)
+                    // Kept: an LSUIElement app has no app menu of its own, so this button is the
+                    // only place ⌘Q can be bound while the Settings window is key.
+                    .keyboardShortcut("q", modifiers: .command)
+                    Spacer()
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut("q", modifiers: .command)
             }
         }
         .formStyle(.grouped)
