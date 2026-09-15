@@ -295,23 +295,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func handleStatusClick() {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
-            let menu = NSMenu()
-            menu.autoenablesItems = false
-
-            let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-            settingsItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
-            settingsItem.target = self
-            menu.addItem(settingsItem)
-
-            menu.addItem(NSMenuItem.separator())
-
-            let quitItem = NSMenuItem(title: "Quit iActivity", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-            quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
-            menu.addItem(quitItem)
-
-            statusItem?.menu = menu
+            statusItem?.menu = buildStatusMenu()
             statusItem?.button?.performClick(nil)
-            
+
             // Match BatterySense pattern: clear menu reference so it doesn't hijack left-click
             DispatchQueue.main.async { [weak self] in
                 self?.statusItem?.menu = nil
@@ -321,7 +307,121 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func buildStatusMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        // Settings/Quit carry no custom symbol — macOS decorates rows using these two exact
+        // actions with its own icon, and adding one doubles it (design-system § 15's Settings
+        // note, same behaviour holds for Quit here).
+        menu.addItem(iconMenuItem("Settings…", symbol: nil, action: #selector(openSettings), keyEquivalent: ","))
+
+        let moreItem = NSMenuItem(title: "More", action: nil, keyEquivalent: "")
+        moreItem.attributedTitle = styledMenuTitle("More", symbol: "ellipsis.circle", enabled: true)
+        moreItem.submenu = buildMoreMenu()
+        menu.addItem(moreItem)
+
+        menu.addItem(.separator())
+        menu.addItem(iconMenuItem("Quit iActivity", symbol: nil, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+
+        return menu
+    }
+
+    private func buildMoreMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        menu.addItem(iconMenuItem("About", symbol: "info.circle", action: #selector(showAbout)))
+        menu.addItem(iconMenuItem("Support & Feedback", symbol: "bubble.left", action: #selector(openSupport)))
+
+        menu.addItem(.separator())
+
+        menu.addItem(iconMenuItem("Tips", symbol: "lightbulb", action: #selector(showTips)))
+        menu.addItem(iconMenuItem("FAQ", symbol: "questionmark.circle", action: #selector(openFAQ)))
+        menu.addItem(iconMenuItem("Website", symbol: "globe", action: #selector(openWebsite)))
+
+        menu.addItem(.separator())
+
+        // ponytail: no Mac App Store listing yet (DMG-only per README) — item stays disabled
+        // until a real store link exists. Wire `openRateApp` up once there's a URL/ID to open.
+        menu.addItem(iconMenuItem("Rate App", symbol: "star", action: nil))
+        menu.addItem(iconMenuItem("Share App", symbol: "square.and.arrow.up", action: #selector(shareApp)))
+        menu.addItem(iconMenuItem("More Apps by Me", symbol: "square.stack.3d.up", action: #selector(openMoreApps)))
+
+        return menu
+    }
+
+    /// `NSMenuItem.image` silently fails to draw on some SDKs (design-system § 15) — the image
+    /// only reliably renders when it rides inside the *title* as a text attachment, since the
+    /// menu always draws titles. Every item in this menu goes through here for that reason.
+    /// `symbol: nil` renders a plain title — used for the two rows macOS already decorates itself.
+    private func iconMenuItem(_ title: String, symbol: String?, action: Selector?, keyEquivalent: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+        item.target = self
+        item.isEnabled = action != nil
+        item.attributedTitle = styledMenuTitle(title, symbol: symbol, enabled: item.isEnabled)
+        return item
+    }
+
+    private func styledMenuTitle(_ title: String, symbol: String?, enabled: Bool) -> NSAttributedString {
+        let line = NSMutableAttributedString()
+        if let symbol, let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)) {
+            let attachment = NSTextAttachment()
+            attachment.image = symbolImage
+            attachment.bounds = CGRect(x: 0, y: -3, width: 15, height: 15)
+            line.append(NSAttributedString(attachment: attachment))
+            line.append(NSAttributedString(string: "  "))
+        }
+        // An attributed title opts out of automatic disabled-row greying (§ 15) — apply it by
+        // hand so the still-inert "Rate App" row doesn't read as a live, clickable item.
+        let textColor: NSColor = enabled ? .labelColor : .disabledControlTextColor
+        line.append(NSAttributedString(string: title, attributes: [.font: NSFont.menuFont(ofSize: 13), .foregroundColor: textColor]))
+        return line
+    }
+
     @objc func openSettings() {
         showSettings()
+    }
+
+    @objc private func showAbout() {
+        NSApp.orderFrontStandardAboutPanel(nil)
+    }
+
+    @objc private func showTips() {
+        let alert = NSAlert()
+        alert.messageText = "Tips"
+        alert.informativeText = """
+        ← / → — switch between tabs
+        ⌘1–⌘6 — jump straight to a tab
+        Esc — close the dashboard
+        Space, outside the panel — also closes it
+        """
+        alert.alertStyle = .informational
+        alert.runModal()
+    }
+
+    @objc private func openSupport() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity/issues/new")!)
+    }
+
+    @objc private func openFAQ() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity#readme")!)
+    }
+
+    @objc private func openWebsite() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity")!)
+    }
+
+    @objc private func shareApp() {
+        guard let button = statusItem?.button else { return }
+        let picker = NSSharingServicePicker(items: [URL(string: "https://github.com/1mrajeevranjan/iActivity")!])
+        picker.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+    }
+
+    @objc private func openMoreApps() {
+        // ponytail: no App Store developer page yet — points at the GitHub profile instead.
+        // Swap for the real "see all developer apps" link once one exists.
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan")!)
     }
 }
