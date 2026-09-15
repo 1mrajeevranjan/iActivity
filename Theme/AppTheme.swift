@@ -1,56 +1,84 @@
 import SwiftUI
 
 enum AppTheme {
+    /// Layered surfaces. The panel is the ground, a card sits on it, a tile sits inside a card.
+    /// Each step is expressed as alpha over the appearance's own base rather than a fixed colour,
+    /// so all three layers stay correctly ordered in Light, Dark and System.
     enum Colors {
-        // BatterySense "Vibrant Dark" Palette
-        static let background = Color(NSColor(name: nil) { appearance in
-            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-                return NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
-            } else {
-                return NSColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1.0)
-            }
+        static let background = Color(nsColor: .windowBackgroundColor)
+
+        /// Card on the panel: a white card on the light grey ground (System Settings convention),
+        /// a lifted plane on the dark ground.
+        static let card = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor.white.withAlphaComponent(0.055)
+                : NSColor.white
         })
-        
-        static let cardBackground = Color(NSColor(name: nil) { appearance in
-            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-                return NSColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1.0)
-            } else {
-                return NSColor.white
-            }
+
+        /// Tile inside a card — one more step in the same direction.
+        static let tile = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor.white.withAlphaComponent(0.06)
+                : NSColor.black.withAlphaComponent(0.04)
         })
-        
-        static let batteryGreen = Color(red: 0.18, green: 0.8, blue: 0.44) // Vibrant Emerald
-        static let brandBlue = Color(red: 0.2, green: 0.6, blue: 1.0)
-        
-        static let cpuGradient = Gradient(colors: [brandBlue, brandBlue.opacity(0.7)])
-        static let gpuGradient = Gradient(colors: [Color.purple, Color.purple.opacity(0.7)])
-        static let memGradient = Gradient(colors: [batteryGreen, batteryGreen.opacity(0.7)])
-        static let diskGradient = Gradient(colors: [Color.orange, Color.orange.opacity(0.7)])
-        static let batteryGradient = Gradient(colors: [batteryGreen, batteryGreen.opacity(0.8)])
-        static let networkGradient = Gradient(colors: [Color.cyan, Color.cyan.opacity(0.7)])
-        
+
+        /// Unfilled part of a progress bar.
+        static let track = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor.white.withAlphaComponent(0.11)
+                : NSColor.black.withAlphaComponent(0.09)
+        })
+
+        /// Hairline that survives Increase Contrast — `separatorColor` is deliberately faint and
+        /// all but disappears once the user asks for more contrast.
+        static func hairline(_ contrast: ColorSchemeContrast) -> Color {
+            contrast == .increased ? Color.primary.opacity(0.45) : Color(nsColor: .separatorColor)
+        }
+
+        // Category hues. System colours, not literals: each is a distinct identity for a data
+        // series (legitimate semantic use, not decoration) and the system variants shift correctly
+        // in Dark Mode and under Increase Contrast.
+        static let batteryGreen = Color.green
+        static let brandBlue = Color.blue
+
         static func accentColor(for category: MetricCategory) -> Color {
             switch category {
             case .cpu: return brandBlue
-            case .gpu: return .purple
+            case .gpu: return .cyan
             case .memory: return batteryGreen
             case .disk: return .orange
             case .battery: return batteryGreen
-            case .network: return .cyan
+            case .network: return .teal
             }
         }
     }
-    
-    enum Spacing {
-        static let tiny: CGFloat = 6
-        static let small: CGFloat = 10
-        static let medium: CGFloat = 16
-        static let large: CGFloat = 24
+
+    /// Compact metrics. Everything here is sized for a menu-bar panel read at arm's length —
+    /// dense enough to show a whole category without scrolling, never so small it strains.
+    enum Metrics {
+        static let cardRadius: CGFloat = 12
+        static let tileRadius: CGFloat = 8
+        static let chipRadius: CGFloat = 8
+
+        static let cardPadding: CGFloat = 12
+        /// Gap between the card's stacked groups (tiles → usage → processes).
+        static let groupSpacing: CGFloat = 12
+        /// Gap between rows inside one group.
+        static let rowSpacing: CGFloat = 8
+
+        static let barHeight: CGFloat = 6
+        static let sparklineHeight: CGFloat = 34
+        static let tileHeight: CGFloat = 46
+        static let tabHeight: CGFloat = 38
+        static let footerHeight: CGFloat = 30
+        static let iconColumn: CGFloat = 16
     }
-    
-    enum Radius {
-        static let card: CGFloat = 14
-        static let inner: CGFloat = 10
+
+    enum Spacing {
+        static let tiny: CGFloat = 4
+        static let small: CGFloat = 8
+        static let medium: CGFloat = 12
+        static let large: CGFloat = 16
     }
 
     /// Geometry shared between the SwiftUI dashboard and the AppKit panel that hosts it.
@@ -58,8 +86,8 @@ enum AppTheme {
     /// out inside the window — a shadow that reaches the window edge gets clipped there and
     /// reads as a hard rectangular outline around the popover.
     enum Panel {
-        static let cardWidth: CGFloat = 440
-        static let cardHeight: CGFloat = 620
+        static let cardWidth: CGFloat = 340
+        static let cardHeight: CGFloat = 640
         static let cornerRadius: CGFloat = 18
 
         /// Transparent gutter on the sides and bottom that gives the shadow room to fade.
@@ -67,14 +95,12 @@ enum AppTheme {
 
         /// Gutter above the beak's tip. AppKit clamps a window's top to the menu bar, so the window
         /// top ends up flush with it and this doubles as the gap between the menu bar and the beak.
-        /// Kept tiny so the beak reads as touching the menu bar; the card's shadow is offset
-        /// downward by a matching amount so it still fades out inside this margin.
         static let topGutter: CGFloat = 2
 
         /// Width of the beak's base where it meets the card.
-        static let beakWidth: CGFloat = 24
+        static let beakWidth: CGFloat = 22
         /// How far the beak rises above the card's top edge.
-        static let beakRise: CGFloat = 11
+        static let beakRise: CGFloat = 10
 
         static var topInset: CGFloat { topGutter + beakRise }
         static var windowWidth: CGFloat { cardWidth + shadowMargin * 2 }
@@ -87,51 +113,40 @@ enum AppTheme {
     }
 }
 
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
-
 enum MetricCategory: String, CaseIterable, Identifiable {
     case cpu, gpu, memory, disk, battery, network
     var id: String { self.rawValue }
-    
+
     var icon: String {
         switch self {
         case .cpu: return "cpu"
-        case .gpu: return "square.grid.3x1.below.line.grid.1x2"
+        case .gpu: return "square.grid.3x3.fill"
         case .memory: return "memorychip"
         case .disk: return "internaldrive"
-        case .battery: return "battery.100"
-        case .network: return "network"
+        case .battery: return "bolt.fill"
+        case .network: return "globe"
         }
     }
-    
+
+    /// All-caps form, for the eyebrow label above the card.
     var title: String {
         self.rawValue.uppercased()
     }
-    
+
+    /// Sentence-case name for anything a person reads as prose: VoiceOver, menus, Settings.
+    /// Never expose `title` or `shortTitle` to VoiceOver — it spells "MEM" and "BAT" out letter
+    /// by letter.
+    var displayName: String {
+        switch self {
+        case .cpu: return "CPU"
+        case .gpu: return "GPU"
+        case .memory: return "Memory"
+        case .disk: return "Disk"
+        case .battery: return "Battery"
+        case .network: return "Network"
+        }
+    }
+
     var shortTitle: String {
         switch self {
         case .cpu: return "CPU"
@@ -144,7 +159,29 @@ enum MetricCategory: String, CaseIterable, Identifiable {
     }
 }
 
+extension MetricCategory {
+    /// Tab order arithmetic for the dashboard's keyboard navigation, kept out of the event
+    /// handler so it can be tested without fabricating an `NSEvent`.
+
+    /// Steps `delta` places along `allCases`, wrapping at both ends — ← from the first tab lands
+    /// on the last, → from the last lands on the first.
+    static func stepping(from current: MetricCategory, by delta: Int) -> MetricCategory {
+        let all = allCases
+        guard let index = all.firstIndex(of: current) else { return current }
+        let count = all.count
+        let next = ((index + delta) % count + count) % count
+        return all[next]
+    }
+
+    /// The category ⌘N selects, or nil if there is no Nth tab.
+    static func at(oneBasedIndex index: Int) -> MetricCategory? {
+        guard allCases.indices.contains(index - 1) else { return nil }
+        return allCases[index - 1]
+    }
+}
+
 enum AppearanceMode: String, CaseIterable, Identifiable {
+    // `auto` keeps its raw value so existing preferences survive; only the label reads "System".
     case light, dark, auto
     var id: String { rawValue }
 
@@ -152,7 +189,7 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
         switch self {
         case .light: return "Light"
         case .dark: return "Dark"
-        case .auto: return "Auto"
+        case .auto: return "System"
         }
     }
 

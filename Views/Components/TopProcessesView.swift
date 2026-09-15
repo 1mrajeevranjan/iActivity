@@ -1,87 +1,82 @@
 import SwiftUI
 
+/// Compact process list: name left, reading right, a faint proportional bar behind each row.
+/// No rank badges, no card of its own — it is a group inside the category's single card.
 struct TopProcessesView: View {
-    let title: String
     let processes: [ProcessMonitor.ProcessEntry]
     let metric: Metric
-    let color: Color
-    
+    let tint: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     enum Metric {
         case cpu
         case memory
     }
-    
+
+    private var rows: [ProcessMonitor.ProcessEntry] { Array(processes.prefix(5)) }
+
+    private func amount(_ process: ProcessMonitor.ProcessEntry) -> Double {
+        metric == .cpu ? process.cpuPercent : process.memoryMB
+    }
+
+    /// Bars scale against the largest value **in the same unit**. Dividing every row by the top
+    /// process's CPU percentage made the Memory list compare gigabytes to a percentage.
+    private var peak: Double { max(rows.map(amount).max() ?? 0, .leastNonzeroMagnitude) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "list.bullet.rectangle.portrait.fill")
-                    .foregroundColor(color)
-                    .font(.system(size: 12, weight: .bold))
-                Text(title)
-                    .font(.system(size: 13, weight: .bold))
-                Spacer()
-            }
-            .padding(.bottom, 2)
-            
-            if processes.isEmpty {
+        VStack(spacing: 2) {
+            if rows.isEmpty {
                 HStack {
                     Spacer()
-                    ProgressView().scaleEffect(0.8)
+                    ProgressView().controlSize(.small)
                     Spacer()
                 }
-                .padding(.vertical, 20)
+                .frame(height: 56)
+                .accessibilityLabel(Text("Loading processes"))
             } else {
-                VStack(spacing: 4) {
-                    ForEach(Array(processes.enumerated().prefix(5)), id: \.element.id) { index, process in
-                        VStack(spacing: 0) {
-                            HStack(spacing: 10) {
-                                ZStack {
-                                    Circle()
-                                        .fill(color.opacity(0.1))
-                                        .frame(width: 18, height: 18)
-                                    Text("\(index + 1)")
-                                        .font(.system(size: 9, weight: .black, design: .rounded))
-                                        .foregroundStyle(.primary)
-                                }
-                                
-                                Text(process.name)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                                
-                                Spacer()
-                                
-                                Text(metric == .cpu ? formatCPU(process.cpuPercent) : formatMemory(process.memoryMB))
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 4)
-                        }
-                        .background {
-                            // Relative bar background
-                            GeometryReader { geo in
-                                let maxVal = processes.first?.cpuPercent ?? 100.0
-                                let currentVal = metric == .cpu ? process.cpuPercent : (process.memoryMB / 1024.0) // simplified relative scale
-                                let relativeWidth = maxVal > 0 ? (currentVal / maxVal) : 0
-                                
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(color.opacity(0.05))
-                                    .frame(width: geo.size.width * CGFloat(relativeWidth))
-                                    .animation(.spring(), value: relativeWidth)
-                            }
-                        }
-                    }
+                ForEach(rows) { process in
+                    row(process)
                 }
             }
         }
-        .glassTile(padding: 12, tint: color)
     }
-    
+
+    private func row(_ process: ProcessMonitor.ProcessEntry) -> some View {
+        let display = metric == .cpu ? formatCPU(process.cpuPercent) : formatMemory(process.memoryMB)
+        let fraction = amount(process) / peak
+
+        return HStack(spacing: 8) {
+            Text(process.name)
+                .font(.callout)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            Text(display)
+                .font(.callout.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(alignment: .leading) {
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(tint.opacity(0.13))
+                    .frame(width: geo.size.width * CGFloat(min(max(fraction, 0), 1)))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: fraction)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(process.name))
+        .accessibilityValue(Text(display))
+    }
+
     private func formatCPU(_ value: Double) -> String {
         String(format: "%.1f%%", value)
     }
-    
+
     private func formatMemory(_ mb: Double) -> String {
         if mb >= 1024 {
             return String(format: "%.1f GB", mb / 1024)

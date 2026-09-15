@@ -3,96 +3,159 @@ import SwiftUI
 struct CPUView: View {
     @Environment(SystemMonitor.self) private var monitor
     @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
+    @State private var showingCores = false
 
     private var tint: Color { AppTheme.Colors.accentColor(for: .cpu) }
 
-    var body: some View {
-        VStack(spacing: AppTheme.Spacing.medium) {
-            HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
-                CircularGauge(
-                    value: monitor.cpu.usage,
-                    title: "CPU",
-                    unit: "\(Int(monitor.cpu.usage * 100))%",
-                    gradient: AppTheme.Colors.cpuGradient
-                )
-                .glassTile(padding: AppTheme.Spacing.large, tint: tint)
+    /// P-cores keep the CPU tab's blue; E-cores take the cooler teal so the two clusters are
+    /// distinguishable at a glance without either reading as an alert colour.
+    static let performanceTint = AppTheme.Colors.brandBlue
+    static let efficiencyTint = Color.teal
 
-                StatTileGrid(tiles: [
-                    ("cpu", "Cores", "\(monitor.cpu.coreUsages.count)"),
-                    ("thermometer.medium", "Temp", temperatureUnit.string(fromCelsius: monitor.cpu.temperature)),
-                    ("gauge.with.needle", "Peak", "\(Int((monitor.cpu.history.max() ?? 0) * 100))%"),
-                    ("chart.bar.fill", "Avg", "\(Int(average(monitor.cpu.history) * 100))%"),
-                ], tint: tint)
-                .frame(maxWidth: .infinity)
-            }
-
-            StatTile(icon: "cpu.fill", label: "Model", value: monitor.cpu.modelName, tint: tint)
-
-            ChartCard(
-                title: "Usage History",
-                value: "\(Int(monitor.cpu.usage * 100))%",
-                data: monitor.cpu.history,
-                gradient: AppTheme.Colors.cpuGradient,
-                tint: tint
-            )
-
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                Text("Cores Activity")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(.secondary)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppTheme.Spacing.small) {
-                    ForEach(0..<monitor.cpu.coreUsages.count, id: \.self) { index in
-                        CoreBar(index: index, usage: monitor.cpu.coreUsages[index])
-                    }
-                }
-            }
-            .glassTile(tint: tint)
-
-            TopProcessesView(
-                title: "Top CPU Processes",
-                processes: monitor.processes.topByCPU,
-                metric: .cpu,
-                color: tint
-            )
+    static func coreTint(_ kind: CPUMonitor.CoreKind, fallback: Color) -> Color {
+        switch kind {
+        case .performance: return performanceTint
+        case .efficiency: return efficiencyTint
+        case .undifferentiated: return fallback
         }
     }
 
-    private func average(_ values: [Double]) -> Double {
-        guard !values.isEmpty else { return 0 }
-        return values.reduce(0, +) / Double(values.count)
+    var body: some View {
+        VStack(spacing: AppTheme.Metrics.groupSpacing) {
+            StatTileRow(tiles: [
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.cpu.temperature, decimals: 0)),
+                .init(icon: "cpu", label: "Cores", value: "\(monitor.cpu.coreUsages.count)"),
+                .init(icon: "chart.bar.fill", label: "Peak", value: "\(Int((monitor.cpu.history.max() ?? 0) * 100))%"),
+            ], tint: tint)
+
+            CardDivider()
+
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Processor usage")
+
+                MetricRow(
+                    label: "CPU",
+                    value: "\(Int(monitor.cpu.usage * 100))%",
+                    fraction: monitor.cpu.usage,
+                    tint: tint,
+                    history: monitor.cpu.history,
+                    domain: 0...1
+                )
+
+                DisclosureRow(title: "Cores", isExpanded: $showingCores)
+
+                if showingCores {
+                    VStack(spacing: 5) {
+                        ForEach(Array(monitor.cpu.coreUsages.enumerated()), id: \.offset) { index, usage in
+                            let kind = monitor.cpu.coreKind(at: index)
+                            CoreBar(kind: kind, usage: usage, tint: Self.coreTint(kind, fallback: tint))
+                        }
+                    }
+
+                    if monitor.cpu.efficiencyCoreCount > 0 {
+                        HStack(spacing: 12) {
+                            CoreLegend(text: "Performance", color: Self.performanceTint)
+                            CoreLegend(text: "Efficiency", color: Self.efficiencyTint)
+                            Spacer()
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+            }
+
+            CardDivider()
+
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Top processes")
+                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+            }
+
+            CardDivider()
+
+            FactRow(label: "Model", value: monitor.cpu.modelName, icon: "cpu.fill", tint: tint)
+        }
     }
 }
 
 struct CoreBar: View {
-    let index: Int
+    let kind: CPUMonitor.CoreKind
     let usage: Double
+    let tint: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Core \(index)")
-                .font(.caption2)
+        HStack(spacing: 8) {
+            Text(kind.label)
+                .font(.caption)
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
+                .frame(width: 58, alignment: .leading)
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.primary.opacity(0.1))
+            ProgressBar(fraction: usage, tint: tint, animated: !reduceMotion)
 
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(LinearGradient(gradient: AppTheme.Colors.cpuGradient, startPoint: .leading, endPoint: .trailing))
-                        .frame(width: geo.size.width * CGFloat(usage))
-                }
-            }
-            .frame(height: 4)
+            Text("\(Int(usage * 100))%")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 32, alignment: .trailing)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(kind.spokenLabel))
+        .accessibilityValue(Text("\(Int(usage * 100)) percent"))
     }
 }
 
-#Preview {
-    CPUView()
-        .environment(SystemMonitor())
-        .padding()
+/// Dot + name, so the two core colours are decoded rather than guessed — colour alone is never
+/// the only carrier of meaning.
+struct CoreLegend: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(text)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Chevron row that expands a nested group, matching the panel's disclosure idiom.
+struct DisclosureRow: View {
+    let title: String
+    @Binding var isExpanded: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button {
+            if reduceMotion {
+                isExpanded.toggle()
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .pointerOnHover()
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(isExpanded ? "Expanded" : "Collapsed"))
+        .accessibilityAddTraits(.isButton)
+    }
 }

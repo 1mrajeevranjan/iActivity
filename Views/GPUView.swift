@@ -7,40 +7,46 @@ struct GPUView: View {
     private var tint: Color { AppTheme.Colors.accentColor(for: .gpu) }
 
     var body: some View {
-        VStack(spacing: AppTheme.Spacing.medium) {
-            HStack(alignment: .top, spacing: AppTheme.Spacing.medium) {
-                CircularGauge(
-                    value: monitor.gpu.utilization,
-                    title: "GPU",
-                    unit: "\(Int(monitor.gpu.utilization * 100))%",
-                    gradient: AppTheme.Colors.gpuGradient
-                )
-                .glassTile(padding: AppTheme.Spacing.large, tint: tint)
+        VStack(spacing: AppTheme.Metrics.groupSpacing) {
+            StatTileRow(tiles: [
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.gpu.temperature, decimals: 0)),
+                .init(icon: "memorychip", label: "VRAM", value: monitor.gpu.vramTotal > 0 ? formatBytes(monitor.gpu.vramTotal) : "Unified"),
+                .init(icon: "chart.bar.fill", label: "Peak", value: "\(Int((monitor.gpu.history.max() ?? 0) * 100))%"),
+            ], tint: tint)
 
-                StatTileGrid(tiles: [
-                    ("thermometer.medium", "Temp", temperatureUnit.string(fromCelsius: monitor.gpu.temperature)),
-                    ("memorychip", "VRAM", monitor.gpu.vramTotal > 0 ? formatBytes(monitor.gpu.vramTotal) : "Unified"),
-                    ("bolt.fill", "Status", monitor.gpu.utilization > 0.8 ? "High Load" : "Normal"),
-                ], tint: tint)
-                .frame(maxWidth: .infinity)
+            CardDivider()
+
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Graphics usage")
+
+                MetricRow(
+                    label: "GPU",
+                    value: "\(Int(monitor.gpu.utilization * 100))%",
+                    fraction: monitor.gpu.utilization,
+                    tint: tint,
+                    history: monitor.gpu.history,
+                    domain: 0...1
+                )
             }
 
-            StatTile(icon: "square.grid.3x1.below.line.grid.1x2", label: "Renderer", value: monitor.gpu.rendererName, tint: tint)
+            CardDivider()
 
-            ChartCard(
-                title: "Utilization History",
-                value: "\(Int(monitor.gpu.utilization * 100))%",
-                data: monitor.gpu.history,
-                gradient: AppTheme.Colors.gpuGradient,
-                tint: tint
-            )
+            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                GroupLabel(text: "Top processes")
+                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+            }
 
-            TopProcessesView(
-                title: "Top GPU Processes",
-                processes: monitor.processes.topByCPU,
-                metric: .cpu,
-                color: tint
-            )
+            CardDivider()
+
+            VStack(spacing: AppTheme.Metrics.rowSpacing) {
+                FactRow(label: "Renderer", value: monitor.gpu.rendererName, icon: "display", tint: tint)
+                FactRow(
+                    label: "Status",
+                    value: monitor.gpu.utilization > 0.8 ? "High load" : "Normal",
+                    icon: "bolt.fill",
+                    tint: monitor.gpu.utilization > 0.8 ? .orange : tint
+                )
+            }
         }
     }
 
@@ -48,6 +54,7 @@ struct GPUView: View {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useGB]
         formatter.countStyle = .memory
+        formatter.allowsNonnumericFormatting = false
         return formatter.string(fromByteCount: bytes)
     }
 }
