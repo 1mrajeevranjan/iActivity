@@ -25,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     var statusItem: NSStatusItem?
+    private var menuBarHosting: ClickThroughHostingView<MenuBarLabel>?
     var monitor = SystemMonitor()
     var panelManager: PanelManager?
     var updateTimer: Timer?
@@ -43,17 +44,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
-            // Native styling for perfect alignment
-            button.font = NSFont.monospacedDigitSystemFont(ofSize: 13.5, weight: .bold)
+            // The readout is SwiftUI now, so the button draws no title or image of its own.
+            // Hosting it here is what lets the menu bar share one chart renderer with the
+            // dashboard instead of reimplementing every ChartStyle in Core Graphics.
+            // Sized from its own content, deliberately NOT pinned to the button's edges.
+            // Constraining it to fill the button makes `fittingSize` report the button's width,
+            // which is itself whatever `statusItem.length` was last set to — a loop that
+            // resolves to nothing and leaves an invisible, unclickable item in the menu bar.
+            let hosting = ClickThroughHostingView(rootView: MenuBarLabel(monitor: monitor))
+            hosting.translatesAutoresizingMaskIntoConstraints = true
+            hosting.autoresizingMask = []
+            button.addSubview(hosting)
+            menuBarHosting = hosting
         }
 
-        // Update the menu bar natively every second
+        // SwiftUI redraws the strip's contents by itself; this only reconciles the status
+        // item's width, which is AppKit state nothing updates on its behalf.
         updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.updateMenuBarDisplay()
+                self?.syncMenuBarWidth()
             }
         }
-        updateMenuBarDisplay()
+        syncMenuBarWidth()
 
         // Show onboarding on first launch
         if !UserDefaults.standard.bool(forKey: "hasFinishedOnboarding") {
@@ -167,151 +179,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         onboardingWindow?.makeKeyAndOrderFront(nil)
     }
 
-    func updateMenuBarDisplay() {
-        guard let button = statusItem?.button else { return }
+    /// Keeps the status item exactly as wide as its hosted content.
+    ///
+    /// A stale length either clips the strip or leaves dead space beside it, and the width
+    /// genuinely moves: network's `↓42.1M ↑1.2M` is several times wider than CPU's `4%`, and
+    /// the whole strip grows and shrinks as categories are added in Settings.
+    func syncMenuBarWidth() {
+        guard let hosting = menuBarHosting, let statusItem, let button = statusItem.button else { return }
 
-        let categoryRaw = UserDefaults.standard.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
-        let category = MetricCategory(rawValue: categoryRaw) ?? .cpu
-
-        let tempStr = temperatureString(for: category)
-
-        var usageStr = ""
-        var isCritical = false
-        var isWarning = false
-        var iconName = category.icon
-
-        switch category {
-        case .cpu:
-            let val = monitor.cpu.usage
-            usageStr = "\(Int(val * 100))%"
-            isCritical = val >= 0.90
-            isWarning = val >= 0.70
-        case .gpu:
-            let val = monitor.gpu.utilization
-            usageStr = "\(Int(val * 100))%"
-            isCritical = val >= 0.90
-            isWarning = val >= 0.70
-        case .memory:
-            let val = monitor.memory.usagePercentage
-            usageStr = "\(Int(val * 100))%"
-            isCritical = val >= 0.90
-            isWarning = val >= 0.75
-        case .disk:
-            let val = monitor.disk.usagePercentage
-            usageStr = "\(Int(val * 100))%"
-            isCritical = val >= 0.95
-            isWarning = val >= 0.85
-        case .battery:
-            let val = monitor.battery.level
-            let charging = monitor.battery.isCharging
-            usageStr = "\(val)%"
-            isCritical = (val <= 10 && !charging)
-            isWarning = (val <= 20 && !charging)
-            
-            if charging       { iconName = "battery.100.bolt" }
-            else if val > 80  { iconName = "battery.100" }
-            else if val > 50  { iconName = "battery.75"  }
-            else if val > 25  { iconName = "battery.50"  }
-            else if val > 10  { iconName = "battery.25"  }
-            else              { iconName = "battery.0" }
-            
-        case .network:
-            let down = formatSpeed(monitor.network.downloadSpeed)
-            let up = formatSpeed(monitor.network.uploadSpeed)
-            usageStr = "↓\(down) ↑\(up)"
+        let width = max(hosting.fittingSize.width, 1)
+        if abs(statusItem.length - width) > 0.5 {
+            statusItem.length = width
         }
-
-        let color: NSColor = isCritical ? .systemRed : (isWarning ? .systemOrange : .labelColor)
-        
-        let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        let finalString = NSMutableAttributedString()
-        
-        if !tempStr.isEmpty {
-            let tempAttr = NSAttributedString(
-                string: tempStr + " ",
-                attributes: [
-                    .font: numberFont,
-                    // labelColor, not secondaryLabelColor — the dimmer secondary tone reads as
-                    // near-invisible against the menu bar's translucent, wallpaper-varying backdrop.
-                    .foregroundColor: NSColor.labelColor
-                ]
-            )
-            finalString.append(tempAttr)
-        }
-        
-        let usageAttr = NSAttributedString(
-            string: usageStr + " ",
-            attributes: [
-                .font: numberFont,
-                .foregroundColor: color
-            ]
-        )
-        finalString.append(usageAttr)
-        
-        button.attributedTitle = finalString
-
-        let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
-        if let image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
-            button.image = image.withSymbolConfiguration(config)
-            button.imagePosition = .imageRight
-        }
-    }
-
-    // MARK: - Temperature string per category
-
-    private func temperatureString(for category: MetricCategory) -> String {
-        guard UserDefaults.standard.object(forKey: "showTemperature") as? Bool ?? true else { return "" }
-
-        let temp: Double
-        switch category {
-        case .cpu:
-            temp = monitor.cpu.temperature
-        case .gpu:
-            temp = monitor.gpu.temperature
-        case .memory:
-            temp = monitor.memory.temperature
-        case .disk:
-            temp = monitor.disk.temperature
-        case .battery:
-            temp = monitor.battery.temperature
-        case .network:
-            return "" // No temperature sensor for network
-        }
-        guard temp > 0 else { return "" }
-        let unit = TemperatureUnit(rawValue: UserDefaults.standard.string(forKey: "temperatureUnit") ?? "") ?? .celsius
-        return unit.string(fromCelsius: temp, decimals: 0)
-    }
-
-    private func formatSpeed(_ bytesPerSecond: Double) -> String {
-        if bytesPerSecond >= 1_000_000 {
-            return String(format: "%.1fM", bytesPerSecond / 1_000_000)
-        } else if bytesPerSecond >= 1_000 {
-            return String(format: "%.0fK", bytesPerSecond / 1_000)
-        } else {
-            return String(format: "%.0fB", bytesPerSecond)
-        }
+        // `bounds` is empty until the button has been laid out at least once, and a zero-height
+        // frame renders nothing at all.
+        let height = button.bounds.height > 0 ? button.bounds.height : NSStatusBar.system.thickness
+        hosting.frame = CGRect(x: 0, y: 0, width: width, height: height)
     }
 
     @objc func handleStatusClick() {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
-            let menu = NSMenu()
-            menu.autoenablesItems = false
-
-            let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-            settingsItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
-            settingsItem.target = self
-            menu.addItem(settingsItem)
-
-            menu.addItem(NSMenuItem.separator())
-
-            let quitItem = NSMenuItem(title: "Quit iActivity", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-            quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
-            menu.addItem(quitItem)
-
-            statusItem?.menu = menu
+            statusItem?.menu = buildStatusMenu()
             statusItem?.button?.performClick(nil)
-            
+
             // Match BatterySense pattern: clear menu reference so it doesn't hijack left-click
             DispatchQueue.main.async { [weak self] in
                 self?.statusItem?.menu = nil
@@ -321,7 +212,139 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func buildStatusMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        // Settings/Quit carry no custom symbol — macOS decorates rows using these two exact
+        // actions with its own icon, and adding one doubles it (design-system § 15's Settings
+        // note, same behaviour holds for Quit here).
+        menu.addItem(iconMenuItem("Settings…", symbol: nil, action: #selector(openSettings), keyEquivalent: ","))
+
+        let moreItem = NSMenuItem(title: "More", action: nil, keyEquivalent: "")
+        moreItem.attributedTitle = styledMenuTitle("More", symbol: "ellipsis.circle", enabled: true)
+        moreItem.submenu = buildMoreMenu()
+        menu.addItem(moreItem)
+
+        menu.addItem(.separator())
+        menu.addItem(iconMenuItem("Quit iActivity", symbol: nil, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+
+        return menu
+    }
+
+    private func buildMoreMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        menu.addItem(iconMenuItem("About", symbol: "info.circle", action: #selector(showAbout)))
+        menu.addItem(iconMenuItem("Support & Feedback", symbol: "bubble.left", action: #selector(openSupport)))
+
+        menu.addItem(.separator())
+
+        menu.addItem(iconMenuItem("Tips", symbol: "lightbulb", action: #selector(showTips)))
+        menu.addItem(iconMenuItem("FAQ", symbol: "questionmark.circle", action: #selector(openFAQ)))
+        menu.addItem(iconMenuItem("Website", symbol: "globe", action: #selector(openWebsite)))
+
+        menu.addItem(.separator())
+
+        // ponytail: no Mac App Store listing yet (DMG-only per README) — item stays disabled
+        // until a real store link exists. Wire `openRateApp` up once there's a URL/ID to open.
+        menu.addItem(iconMenuItem("Rate App", symbol: "star", action: nil))
+        menu.addItem(iconMenuItem("Share App", symbol: "square.and.arrow.up", action: #selector(shareApp)))
+        menu.addItem(iconMenuItem("More Apps by Me", symbol: "square.stack.3d.up", action: #selector(openMoreApps)))
+
+        return menu
+    }
+
+    /// `NSMenuItem.image` silently fails to draw on some SDKs (design-system § 15) — the image
+    /// only reliably renders when it rides inside the *title* as a text attachment, since the
+    /// menu always draws titles. Every item in this menu goes through here for that reason.
+    /// `symbol: nil` renders a plain title — used for the two rows macOS already decorates itself.
+    private func iconMenuItem(_ title: String, symbol: String?, action: Selector?, keyEquivalent: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+        item.target = self
+        item.isEnabled = action != nil
+        item.attributedTitle = styledMenuTitle(title, symbol: symbol, enabled: item.isEnabled)
+        return item
+    }
+
+    private func styledMenuTitle(_ title: String, symbol: String?, enabled: Bool) -> NSAttributedString {
+        let line = NSMutableAttributedString()
+        if let symbol, let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)) {
+            let attachment = NSTextAttachment()
+            attachment.image = symbolImage
+            attachment.bounds = CGRect(x: 0, y: -3, width: 15, height: 15)
+            line.append(NSAttributedString(attachment: attachment))
+            line.append(NSAttributedString(string: "  "))
+        }
+        // An attributed title opts out of automatic disabled-row greying (§ 15) — apply it by
+        // hand so the still-inert "Rate App" row doesn't read as a live, clickable item.
+        let textColor: NSColor = enabled ? .labelColor : .disabledControlTextColor
+        line.append(NSAttributedString(string: title, attributes: [.font: NSFont.menuFont(ofSize: 13), .foregroundColor: textColor]))
+        return line
+    }
+
     @objc func openSettings() {
         showSettings()
+    }
+
+    @objc private func showAbout() {
+        NSApp.orderFrontStandardAboutPanel(nil)
+    }
+
+    @objc private func showTips() {
+        let alert = NSAlert()
+        alert.messageText = "Tips"
+        alert.informativeText = """
+        ← / → — switch between tabs
+        ⌘1–⌘6 — jump straight to a tab
+        Esc — close the dashboard
+        Space, outside the panel — also closes it
+        """
+        alert.alertStyle = .informational
+        alert.runModal()
+    }
+
+    @objc private func openSupport() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity/issues/new")!)
+    }
+
+    @objc private func openFAQ() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity#readme")!)
+    }
+
+    @objc private func openWebsite() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity")!)
+    }
+
+    @objc private func shareApp() {
+        guard let button = statusItem?.button else { return }
+        let picker = NSSharingServicePicker(items: [URL(string: "https://github.com/1mrajeevranjan/iActivity")!])
+        picker.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+    }
+
+    @objc private func openMoreApps() {
+        // ponytail: no App Store developer page yet — points at the GitHub profile instead.
+        // Swap for the real "see all developer apps" link once one exists.
+        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan")!)
+    }
+}
+
+/// Hosts the menu bar strip without ever becoming the click target.
+///
+/// `NSStatusBarButton` is what opens the panel on a left click and the menu on a right click.
+/// A subview that answered hit tests would swallow both, so this one declines them and every
+/// click lands on the button underneath.
+final class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    required init(rootView: Content) {
+        super.init(rootView: rootView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }

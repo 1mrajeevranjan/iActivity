@@ -13,7 +13,7 @@ let package = Package(
         .executableTarget(
             name: "iActivity",
             path: ".",
-            exclude: ["Tests"],
+            exclude: ["Tests", "docs", "videos"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

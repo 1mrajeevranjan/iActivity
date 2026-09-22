@@ -42,6 +42,17 @@ struct CPUView: View {
                     domain: 0...1
                 )
 
+                if monitor.cpu.hasCoreSplit {
+                    CoreClusterRow(
+                        performanceName: monitor.cpu.performanceClusterName,
+                        efficiencyName: monitor.cpu.efficiencyClusterName,
+                        performance: monitor.cpu.performanceUsage,
+                        efficiency: monitor.cpu.efficiencyUsage,
+                        performanceHistory: monitor.cpu.performanceHistory,
+                        efficiencyHistory: monitor.cpu.efficiencyHistory
+                    )
+                }
+
                 DisclosureRow(title: "Cores", isExpanded: $showingCores)
 
                 if showingCores {
@@ -54,8 +65,8 @@ struct CPUView: View {
 
                     if monitor.cpu.efficiencyCoreCount > 0 {
                         HStack(spacing: 12) {
-                            CoreLegend(text: "Performance", color: Self.performanceTint)
-                            CoreLegend(text: "Efficiency", color: Self.efficiencyTint)
+                            CoreLegend(text: monitor.cpu.performanceClusterName, color: Self.performanceTint)
+                            CoreLegend(text: monitor.cpu.efficiencyClusterName, color: Self.efficiencyTint)
                             Spacer()
                         }
                         .padding(.top, 2)
@@ -74,6 +85,62 @@ struct CPUView: View {
 
             FactRow(label: "Model", value: monitor.cpu.modelName, icon: "cpu.fill", tint: tint)
         }
+    }
+}
+
+/// The two clusters side by side over one shared chart.
+///
+/// Two separate `MetricRow`s would say the same thing at twice the height, and the comparison
+/// *is* the point — performance cores pinned while efficiency cores idle is a shape, not two
+/// numbers that happen to sit near each other. The overall `usage` row above averages the two
+/// together and so describes neither.
+struct CoreClusterRow: View {
+    /// macOS's own names for the clusters, so an M4 reads "Performance" / "Efficiency" and a
+    /// chip that calls them something else reads whatever it calls them.
+    let performanceName: String
+    let efficiencyName: String
+    let performance: Double
+    let efficiency: Double
+    let performanceHistory: [Double]
+    let efficiencyHistory: [Double]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.tiny) {
+            HStack(spacing: AppTheme.Spacing.medium) {
+                reading(performanceName, value: performance, tint: CPUView.performanceTint)
+                reading(efficiencyName, value: efficiency, tint: CPUView.efficiencyTint)
+                Spacer(minLength: 0)
+            }
+
+            Sparkline(
+                data: performanceHistory,
+                tint: CPUView.performanceTint,
+                domain: 0...1,
+                secondary: efficiencyHistory,
+                secondaryTint: CPUView.efficiencyTint
+            )
+        }
+    }
+
+    /// Dot + name + value, so the two colours are decoded rather than guessed — colour alone is
+    /// never the only carrier of meaning, the same rule `CoreLegend` follows.
+    private func reading(_ label: String, value: Double, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(tint)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("\(Int(value * 100))%")
+                .font(.callout.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(label) cores"))
+        .accessibilityValue(Text("\(Int(value * 100)) percent"))
     }
 }
 

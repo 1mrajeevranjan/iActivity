@@ -88,3 +88,29 @@ struct CategoryKeyboardNavigationTests {
         #expect(MetricCategory.battery.displayName == "Battery")
     }
 }
+
+struct ChartStyleTests {
+    @Test("Line stays first — it is the default, and the existing dashboard must render unchanged")
+    func lineIsFirst() {
+        #expect(ChartStyle.allCases.first == .line)
+    }
+
+    @Test("All four shipped styles are present")
+    func allCasesAreExpected() {
+        #expect(ChartStyle.allCases == [.line, .area, .bars, .stepped])
+    }
+
+    @Test("id matches rawValue for AppStorage round-tripping")
+    func idMatchesRawValue() {
+        for style in ChartStyle.allCases {
+            #expect(style.id == style.rawValue)
+        }
+    }
+
+    @Test("Titles are unique and non-empty — they are the only labels in the Settings picker")
+    func titlesAreUniqueAndNonEmpty() {
+        let titles = ChartStyle.allCases.map(\.title)
+        #expect(titles.allSatisfy { !$0.isEmpty })
+        #expect(Set(titles).count == titles.count)
+    }
+}

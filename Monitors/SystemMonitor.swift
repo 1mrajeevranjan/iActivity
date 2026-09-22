@@ -12,14 +12,14 @@ class SystemMonitor {
     var network = NetworkMonitor()
     var processes = ProcessMonitor()
 
-    /// Tracks pause/resume state so `applyInterval` — triggered from Settings independently of the
-    /// panel — knows whether to touch all six monitors or just the menu bar's active one.
+    /// Tracks pause/resume state so `applyInterval` — triggered from Settings independently of
+    /// the panel — knows whether to touch all six monitors or just the menu bar's active set.
     private var isPanelVisible = false
 
     init() {
-        // Only the category the menu bar displays needs to be live before the dashboard is ever
-        // opened — the other five monitors and the process scanner (a full system-wide process
-        // walk) have nothing to feed until then.
+        // Only the categories the menu bar displays need to be live before the dashboard is
+        // ever opened — the remaining monitors and the process scanner (a full system-wide
+        // process walk) have nothing to feed until then.
         pauseBackground()
     }
 
@@ -40,26 +40,28 @@ class SystemMonitor {
         processes.start()
     }
 
-    /// Stops every monitor except the one feeding the menu bar, and the process scanner — used
-    /// while the dashboard panel is closed, when nothing else is visible to update. `interval`
-    /// re-applies a just-changed Settings cadence to the still-running active monitor; `nil` just
-    /// keeps whatever cadence it already had.
+    /// Stops every monitor the menu bar is not showing, plus the process scanner — used while
+    /// the dashboard panel is closed, when nothing else is visible to update. `interval`
+    /// re-applies a just-changed Settings cadence to the monitors still running; `nil` just
+    /// keeps whatever cadence they already had.
     func pauseBackground(interval: TimeInterval? = nil) {
         isPanelVisible = false
-        let activeRaw = UserDefaults.standard.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
-        let active = MetricCategory(rawValue: activeRaw) ?? .cpu
+        // The menu bar may now show several categories at once, so this keeps the whole set
+        // alive rather than a single one. Idle cost scales with that set — the price of the
+        // feature, and the reason Settings says so next to the picker.
+        let active = Set(MenuBarSelection.current.categories)
 
-        if active != .cpu { cpu.stop() } else { cpu.start(interval: interval) }
-        if active != .gpu { gpu.stop() } else { gpu.start(interval: interval) }
-        if active != .memory { memory.stop() } else { memory.start(interval: interval) }
-        if active != .disk { disk.stop() } else { disk.start(interval: interval) }
-        if active != .battery { battery.stop() } else { battery.start(interval: interval) }
-        if active != .network { network.stop() } else { network.start(interval: interval) }
+        if active.contains(.cpu) { cpu.start(interval: interval) } else { cpu.stop() }
+        if active.contains(.gpu) { gpu.start(interval: interval) } else { gpu.stop() }
+        if active.contains(.memory) { memory.start(interval: interval) } else { memory.stop() }
+        if active.contains(.disk) { disk.start(interval: interval) } else { disk.stop() }
+        if active.contains(.battery) { battery.start(interval: interval) } else { battery.stop() }
+        if active.contains(.network) { network.start(interval: interval) } else { network.stop() }
         processes.stop()
     }
 
     /// Overrides the refresh cadence (used by Settings). While the panel is hidden this only
-    /// touches the menu bar's active monitor — applying it to all six would silently undo
+    /// touches the menu bar's active monitors — applying it to all six would silently undo
     /// `pauseBackground()` the next time Settings' "Update Every" picker changes.
     func applyInterval(_ interval: TimeInterval) {
         guard isPanelVisible else {
@@ -72,6 +74,13 @@ class SystemMonitor {
         disk.start(interval: interval)
         battery.start(interval: interval)
         network.start(interval: interval)
+    }
+
+    /// Re-applies the pause policy after the menu bar's category set changes. Without this a
+    /// newly ticked category shows a frozen reading until the dashboard is next opened.
+    func menuBarSelectionChanged() {
+        guard !isPanelVisible else { return }
+        pauseBackground()
     }
 
     func stop() {
