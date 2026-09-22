@@ -44,6 +44,8 @@ struct CPUView: View {
 
                 if monitor.cpu.hasCoreSplit {
                     CoreClusterRow(
+                        performanceName: monitor.cpu.performanceClusterName,
+                        efficiencyName: monitor.cpu.efficiencyClusterName,
                         performance: monitor.cpu.performanceUsage,
                         efficiency: monitor.cpu.efficiencyUsage,
                         performanceHistory: monitor.cpu.performanceHistory,
@@ -63,8 +65,8 @@ struct CPUView: View {
 
                     if monitor.cpu.efficiencyCoreCount > 0 {
                         HStack(spacing: 12) {
-                            CoreLegend(text: "Performance", color: Self.performanceTint)
-                            CoreLegend(text: "Efficiency", color: Self.efficiencyTint)
+                            CoreLegend(text: monitor.cpu.performanceClusterName, color: Self.performanceTint)
+                            CoreLegend(text: monitor.cpu.efficiencyClusterName, color: Self.efficiencyTint)
                             Spacer()
                         }
                         .padding(.top, 2)
@@ -93,6 +95,10 @@ struct CPUView: View {
 /// numbers that happen to sit near each other. The overall `usage` row above averages the two
 /// together and so describes neither.
 struct CoreClusterRow: View {
+    /// macOS's own names for the clusters, so an M4 reads "Performance" / "Efficiency" and a
+    /// chip that calls them something else reads whatever it calls them.
+    let performanceName: String
+    let efficiencyName: String
     let performance: Double
     let efficiency: Double
     let performanceHistory: [Double]
@@ -101,8 +107,8 @@ struct CoreClusterRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tiny) {
             HStack(spacing: AppTheme.Spacing.medium) {
-                reading("P-Cores", spoken: "Performance cores", value: performance, tint: CPUView.performanceTint)
-                reading("E-Cores", spoken: "Efficiency cores", value: efficiency, tint: CPUView.efficiencyTint)
+                reading(performanceName, value: performance, tint: CPUView.performanceTint)
+                reading(efficiencyName, value: efficiency, tint: CPUView.efficiencyTint)
                 Spacer(minLength: 0)
             }
 
@@ -118,7 +124,7 @@ struct CoreClusterRow: View {
 
     /// Dot + name + value, so the two colours are decoded rather than guessed — colour alone is
     /// never the only carrier of meaning, the same rule `CoreLegend` follows.
-    private func reading(_ label: String, spoken: String, value: Double, tint: Color) -> some View {
+    private func reading(_ label: String, value: Double, tint: Color) -> some View {
         HStack(spacing: 5) {
             Circle()
                 .fill(tint)
@@ -133,7 +139,7 @@ struct CoreClusterRow: View {
                 .contentTransition(.numericText())
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(spoken))
+        .accessibilityLabel(Text("\(label) cores"))
         .accessibilityValue(Text("\(Int(value * 100)) percent"))
     }
 }

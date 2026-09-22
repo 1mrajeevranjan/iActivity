@@ -216,3 +216,36 @@ must size from its own content and drive the length, not inherit it.
 would approach 600pt, and on a notched Mac macOS moves the overflow into its hidden section — so
 the strip can be configured into invisibility. The "Show Temperature" and "Show Graph" toggles are
 the mitigation, and the category set is the real control.
+
+
+## Addendum — cluster names follow the chip (added after the first build)
+
+Asked for: M5 reportedly names its cores differently from M4, so labels should match the detected
+CPU and fall back to Apple's standard names on older chips.
+
+Rejected the obvious implementation. A `chip → core name` table would need M5's naming guessed at
+today and corrected with every future generation — and would be wrong the moment Apple shipped
+something unanticipated.
+
+macOS already answers the question. `hw.nperflevels` gives the cluster count and
+`hw.perflevelN.name` gives each cluster's name, as the kernel names it on the machine actually
+running. On this M4: `perflevel0 = Performance` (4 cores), `perflevel1 = Efficiency` (6). Reading
+those means the labels are right on every chip, past and future, with no table to maintain.
+
+Two things were verified empirically rather than assumed:
+
+- **Enumeration order.** The existing code assumed efficiency cores are enumerated first, which
+  matters because `clusterAverages` splits the core list at that index — if it were backwards, the
+  P/E split shipped in the previous commit would have been reporting each cluster as the other.
+  Saturating four threads and sampling `host_processor_info` showed indices 6–9 pegged and 0–5
+  idling, i.e. the 6 Efficiency cores come first. The assumption holds, and the display order is
+  the **reverse** of the perflevel index order.
+- **The sysctl keys themselves.** A mistyped key would return nil and silently degrade every Mac
+  to `Core N` while every pure unit test still passed, so `LiveCoreClusterTests` reads the machine
+  running the suite. It no-ops where no clusters are reported.
+
+Labels are cluster-relative and one-based (`E-Core 1…6`, then `P-Core 1…4`), which also fixed a
+pre-existing off-by-one that numbered Intel's cores from zero. Short forms are derived from the
+reported name's initial, falling back to the full names if two clusters ever share one. A chip
+reporting three or more clusters still labels every core from its own cluster's name; only the
+tint grouping stays binary.

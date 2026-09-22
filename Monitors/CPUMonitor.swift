@@ -19,10 +19,54 @@ class CPUMonitor {
     var temperature: Double = 0
     var modelName: String = "Apple Silicon"
 
-    /// How many of the cores in `coreUsages` are efficiency cores. On Apple Silicon the kernel
-    /// reports them first, so indices `0..<efficiencyCoreCount` are E-cores and the rest are P.
-    /// Zero on Intel, where there is no split and every core is just "Core N".
+    /// How many of the cores in `coreUsages` sit below the most performant cluster. The kernel
+    /// enumerates the least performant cores first, so indices `0..<efficiencyCoreCount` are
+    /// those and the rest are the top cluster. Zero on Intel, where there is no split at all.
     var efficiencyCoreCount: Int = 0
+
+    /// The CPU's clusters, in core-enumeration order, named by macOS itself.
+    var clusters: [CoreCluster] = []
+
+    /// macOS's own names for the two ends of the split, used by the legend and the cluster row.
+    /// The fallbacks only apply where there is no split to name.
+    var performanceClusterName: String { clusters.last?.name ?? "Performance" }
+    var efficiencyClusterName: String { (clusters.count >= 2 ? clusters.first?.name : nil) ?? "Efficiency" }
+
+    /// One of the CPU's performance clusters, named by macOS itself.
+    ///
+    /// `hw.perflevelN.name` is what the kernel calls each cluster on this exact machine —
+    /// "Performance" and "Efficiency" on an M4. Reading it means the labels follow whatever
+    /// Apple ships next, instead of this app carrying a table of per-chip core names that
+    /// would have to be guessed at now and corrected with every new generation.
+    struct CoreCluster: Sendable, Equatable {
+        /// macOS's own name for the cluster, e.g. "Performance".
+        let name: String
+        /// Compact form for the narrow core-list column, e.g. "P-Core".
+        let shortName: String
+        let coreCount: Int
+    }
+
+    /// Builds the cluster list in CORE ENUMERATION order, which is the reverse of the sysctl
+    /// order: `host_processor_info` enumerates the least performant cores first. Verified on an
+    /// M4, where `perflevel0` is Performance with 4 cores but indices 0–5 are the 6 Efficiency
+    /// cores. `nonisolated` and pure so the naming is testable without a sysctl.
+    nonisolated static func clusters(levelNames: [String], levelCounts: [Int]) -> [CoreCluster] {
+        let levels = min(levelNames.count, levelCounts.count)
+        guard levels > 0 else { return [] }
+        let names = Array(levelNames.prefix(levels).reversed())
+        let counts = Array(levelCounts.prefix(levels).reversed())
+        let shortNames = names.map { name in name.first.map { "\($0)-Core" } ?? name }
+        // Two clusters whose names share an initial would render as two identical labels, so
+        // the whole set falls back to the names macOS reported rather than inventing one.
+        let initialsAreDistinct = Set(shortNames).count == shortNames.count
+        return (0..<levels).map { index in
+            CoreCluster(
+                name: names[index],
+                shortName: initialsAreDistinct ? shortNames[index] : names[index],
+                coreCount: counts[index]
+            )
+        }
+    }
 
     /// True only where the kernel actually reports two clusters. Intel has none, and drawing a
     /// P/E split there would be inventing a distinction the hardware does not make.
@@ -48,31 +92,45 @@ class CPUMonitor {
 
     /// Label and class for one core, for the expanded core list.
     func coreKind(at index: Int) -> CoreKind {
-        guard efficiencyCoreCount > 0 else { return .undifferentiated(index) }
-        return index < efficiencyCoreCount
-            ? .efficiency(index + 1)
-            : .performance(index - efficiencyCoreCount + 1)
+        guard clusters.count >= 2 else { return .undifferentiated(index + 1) }
+        var start = 0
+        for (offset, cluster) in clusters.enumerated() {
+            let end = start + cluster.coreCount
+            if index < end {
+                let ordinal = index - start + 1
+                // The last cluster in enumeration order is perflevel0, the most performant one.
+                return offset == clusters.count - 1
+                    ? .performance(ordinal: ordinal, cluster: cluster)
+                    : .efficiency(ordinal: ordinal, cluster: cluster)
+            }
+            start = end
+        }
+        return .undifferentiated(index + 1)
     }
 
-    enum CoreKind {
-        case efficiency(Int)
-        case performance(Int)
+    /// Which end of the split a core sits on, carrying the cluster macOS named it after so the
+    /// labels never hardcode "P-Core" for a chip that calls it something else.
+    enum CoreKind: Equatable {
+        case efficiency(ordinal: Int, cluster: CoreCluster)
+        case performance(ordinal: Int, cluster: CoreCluster)
         case undifferentiated(Int)
 
         var label: String {
             switch self {
-            case .efficiency(let n): return "E-Core \(n)"
-            case .performance(let n): return "P-Core \(n)"
-            case .undifferentiated(let n): return "Core \(n)"
+            case .efficiency(let ordinal, let cluster), .performance(let ordinal, let cluster):
+                return "\(cluster.shortName) \(ordinal)"
+            case .undifferentiated(let ordinal):
+                return "Core \(ordinal)"
             }
         }
 
-        /// Spoken in full — VoiceOver reads "E-Core" as the letter E.
+        /// Spoken in full — VoiceOver reads an abbreviation like "E-Core" as the letter E.
         var spokenLabel: String {
             switch self {
-            case .efficiency(let n): return "Efficiency core \(n)"
-            case .performance(let n): return "Performance core \(n)"
-            case .undifferentiated(let n): return "Core \(n)"
+            case .efficiency(let ordinal, let cluster), .performance(let ordinal, let cluster):
+                return "\(cluster.name) core \(ordinal)"
+            case .undifferentiated(let ordinal):
+                return "Core \(ordinal)"
             }
         }
     }
@@ -90,9 +148,26 @@ class CPUMonitor {
         let brandString = brand.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
         self.modelName = brandString.trimmingCharacters(in: .controlCharacters)
 
-        // perflevel0 is the Performance cluster, perflevel1 the Efficiency one. Both keys are
-        // absent on Intel, where the count stays zero and the cores go unlabelled.
-        self.efficiencyCoreCount = Self.sysctlInt("hw.perflevel1.logicalcpu") ?? 0
+        // macOS names its own clusters, so the labels follow whatever chip this is. Every one
+        // of these keys is absent on Intel, where there are no clusters and each core is just
+        // "Core N".
+        let levelCount = max(Self.sysctlInt("hw.nperflevels") ?? 0, 0)
+        let levelNames = (0..<levelCount).compactMap { Self.sysctlString("hw.perflevel\($0).name") }
+        let levelCounts = (0..<levelCount).compactMap { Self.sysctlInt("hw.perflevel\($0).logicalcpu") }
+        self.clusters = Self.clusters(levelNames: levelNames, levelCounts: levelCounts)
+        // Everything below the most performant cluster. `clusterAverages` splits the core list
+        // at this index and `coreKind` tints those cores as efficiency cores.
+        self.efficiencyCoreCount = self.clusters.dropLast().reduce(0) { $0 + $1.coreCount }
+    }
+
+    private static func sysctlString(_ name: String) -> String? {
+        var size = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
+        let value = buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func sysctlInt(_ name: String) -> Int? {

@@ -9,6 +9,7 @@ A native macOS menu bar system monitor — CPU, GPU, memory, disk, battery, and 
 - **Six live categories** — CPU, GPU, Memory, Disk, Battery, Network — each with a hero gauge, detail tiles, a history chart, and a top-5 process breakdown.
 - **Four chart styles** — line, area, bars or stepped, chosen once in Settings and applied to the dashboard and the menu bar together.
 - **Performance / efficiency split** — on Apple Silicon the CPU tab reads both clusters separately, over one shared chart. The overall average describes neither cluster on its own.
+- **Cluster names come from macOS** — labels are read from `hw.perflevelN.name`, so they are whatever the kernel calls the clusters on the chip you are actually running ("Performance" and "Efficiency" today). Nothing here hardcodes a per-chip table, so a new generation is named correctly without an app update, and Intel — which reports no clusters — simply shows `Core N`.
 - **Native popover presentation** — the dashboard drops from the menu bar icon with a genuine pointed beak, matching Apple's own menu extras. Re-anchors on every open as neighboring menu bar icons shift, and slides its beak to stay aimed at the icon if the panel gets clamped against a screen edge.
 - **Glass pill tab bar** — switching categories slides a shared glass pill under the selection with a spring animation; content transitions in the same direction. Respects Reduce Motion.
 - **Full thermal monitoring** — real-time temperature for every component via SMC, in Celsius or Fahrenheit.
