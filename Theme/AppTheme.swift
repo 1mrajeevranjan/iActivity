@@ -241,3 +241,104 @@ enum RefreshInterval: Double, CaseIterable, Identifiable {
         }
     }
 }
+
+/// Shape of the history charts. `line` is the default and reproduces the original sparkline
+/// exactly, so an existing install's dashboard is unchanged until the user opts into another.
+enum ChartStyle: String, CaseIterable, Identifiable {
+    case line, area, bars, stepped
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .line: return "Line"
+        case .area: return "Area"
+        case .bars: return "Bars"
+        case .stepped: return "Stepped"
+        }
+    }
+}
+
+/// The categories the menu bar shows, in canonical tab order.
+///
+/// `@AppStorage` cannot persist a `Set`, so this is a `RawRepresentable` over a comma-joined
+/// list of `MetricCategory` raw values. The order is normalised to `allCases` rather than kept
+/// in the order the user ticked them, so the strip never reshuffles itself between launches.
+struct MenuBarSelection: RawRepresentable, Equatable, Sendable {
+    let categories: [MetricCategory]
+
+    /// Normalising through `allCases` de-duplicates and fixes the order in one pass.
+    init(_ categories: [MetricCategory]) {
+        self.categories = MetricCategory.allCases.filter(categories.contains)
+    }
+
+    /// Never fails: an unrecognised token is dropped rather than discarding the whole
+    /// selection, so a raw value written by a future version degrades instead of resetting.
+    init?(rawValue: String) {
+        self.init(rawValue.split(separator: ",").compactMap { MetricCategory(rawValue: String($0)) })
+    }
+
+    var rawValue: String { categories.map(\.rawValue).joined(separator: ",") }
+
+    static let storageKey = "menuBarCategories"
+
+    /// The single place the migration and the empty-set fallback live. `SystemMonitor` reads
+    /// `UserDefaults` directly while the views use `@AppStorage`; if each applied these rules
+    /// separately they would drift, and the menu bar would disagree with which monitors run.
+    ///
+    /// A missing key seeds from the dashboard category, so an install that predates this
+    /// setting looks identical after upgrade. An empty selection falls back for the same
+    /// reason a zero-width status item is unacceptable: it cannot be clicked to get it back.
+    static func resolved(rawValue: String?, fallback: MetricCategory) -> MenuBarSelection {
+        if let rawValue, let stored = MenuBarSelection(rawValue: rawValue), !stored.categories.isEmpty {
+            return stored
+        }
+        return MenuBarSelection([fallback])
+    }
+
+    static var current: MenuBarSelection {
+        let defaults = UserDefaults.standard
+        let dashboardRaw = defaults.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
+        let dashboard = MetricCategory(rawValue: dashboardRaw) ?? .cpu
+        return resolved(rawValue: defaults.string(forKey: storageKey), fallback: dashboard)
+    }
+}
+
+/// How a menu bar reading should be coloured. Extracted from the old `updateMenuBarDisplay`
+/// so the per-category thresholds can be tested without standing up a status bar.
+enum MenuBarStatus {
+    case normal, warning, critical
+
+    /// `value` is a 0...1 fraction for every category — battery included, as `level / 100`.
+    static func level(for category: MetricCategory, value: Double, isCharging: Bool) -> MenuBarStatus {
+        switch category {
+        case .cpu, .gpu:
+            if value >= 0.90 { return .critical }
+            if value >= 0.70 { return .warning }
+        case .memory:
+            if value >= 0.90 { return .critical }
+            if value >= 0.75 { return .warning }
+        case .disk:
+            if value >= 0.95 { return .critical }
+            if value >= 0.85 { return .warning }
+        case .battery:
+            // Inverted — low is bad — and a machine on the charger is not in trouble.
+            guard !isCharging else { return .normal }
+            if value <= 0.10 { return .critical }
+            if value <= 0.20 { return .warning }
+        case .network:
+            // Throughput has no ceiling to be a percentage of, so there is nothing to alarm on.
+            return .normal
+        }
+        return .normal
+    }
+
+    /// `.primary` rather than `.secondary`: the dimmer tone reads as near-invisible against the
+    /// menu bar's translucent, wallpaper-varying backdrop.
+    var color: Color {
+        switch self {
+        case .normal: return .primary
+        case .warning: return Color(nsColor: .systemOrange)
+        case .critical: return Color(nsColor: .systemRed)
+        }
+    }
+}

@@ -18,6 +18,9 @@ struct MetricRow: View {
     var domain: ClosedRange<Double>? = nil
     /// Spoken form when `label` is abbreviated.
     var spokenLabel: String? = nil
+    /// Optional second series for the sparkline, drawn on the same scale as `history`.
+    var secondaryHistory: [Double]? = nil
+    var secondaryTint: Color = AppTheme.Colors.brandBlue
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -54,7 +57,13 @@ struct MetricRow: View {
             }
 
             if let history, history.count > 1 {
-                Sparkline(data: history, tint: tint, domain: domain)
+                Sparkline(
+                    data: history,
+                    tint: tint,
+                    domain: domain,
+                    secondary: secondaryHistory,
+                    secondaryTint: secondaryTint
+                )
             }
         }
         .accessibilityElement(children: .ignore)

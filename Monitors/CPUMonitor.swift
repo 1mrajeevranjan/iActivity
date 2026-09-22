@@ -7,6 +7,15 @@ class CPUMonitor {
     var usage: Double = 0
     var coreUsages: [Double] = []
     var history: [Double] = Array(repeating: 0, count: 60)
+
+    /// Mean utilisation of each cluster, and their own history buffers. The overall `usage`
+    /// above averages every core together, which hides exactly the thing a P/E machine is
+    /// interesting for: four performance cores pinned while six efficiency cores idle reads
+    /// as a middling number that describes neither cluster.
+    var performanceUsage: Double = 0
+    var efficiencyUsage: Double = 0
+    var performanceHistory: [Double] = Array(repeating: 0, count: 60)
+    var efficiencyHistory: [Double] = Array(repeating: 0, count: 60)
     var temperature: Double = 0
     var modelName: String = "Apple Silicon"
 
@@ -14,6 +23,28 @@ class CPUMonitor {
     /// reports them first, so indices `0..<efficiencyCoreCount` are E-cores and the rest are P.
     /// Zero on Intel, where there is no split and every core is just "Core N".
     var efficiencyCoreCount: Int = 0
+
+    /// True only where the kernel actually reports two clusters. Intel has none, and drawing a
+    /// P/E split there would be inventing a distinction the hardware does not make.
+    var hasCoreSplit: Bool { efficiencyCoreCount > 0 }
+
+    /// Mean utilisation of each cluster. `nonisolated` and pure: it takes the readings rather
+    /// than reaching for them, so the split can be tested without a Mach call.
+    ///
+    /// On Apple Silicon the kernel reports efficiency cores first, so `0..<efficiencyCoreCount`
+    /// are E and the remainder are P — the same convention `coreKind(at:)` relies on. The count
+    /// is clamped because it comes from a sysctl that may not agree with the core list.
+    nonisolated static func clusterAverages(
+        coreUsages: [Double],
+        efficiencyCoreCount: Int
+    ) -> (performance: Double, efficiency: Double) {
+        guard !coreUsages.isEmpty else { return (0, 0) }
+        let split = min(max(efficiencyCoreCount, 0), coreUsages.count)
+        func mean(_ values: ArraySlice<Double>) -> Double {
+            values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        }
+        return (mean(coreUsages.dropFirst(split)), mean(coreUsages.prefix(split)))
+    }
 
     /// Label and class for one core, for the expanded core list.
     func coreKind(at index: Int) -> CoreKind {
@@ -134,6 +165,14 @@ class CPUMonitor {
             self.coreUsages = coreUsages
             self.history.removeFirst()
             self.history.append(avgUsage)
+
+            let clusters = Self.clusterAverages(coreUsages: coreUsages, efficiencyCoreCount: efficiencyCoreCount)
+            self.performanceUsage = clusters.performance
+            self.efficiencyUsage = clusters.efficiency
+            self.performanceHistory.removeFirst()
+            self.performanceHistory.append(clusters.performance)
+            self.efficiencyHistory.removeFirst()
+            self.efficiencyHistory.append(clusters.efficiency)
             
             // Cleanup previous info
             let prevSize = MemoryLayout<integer_t>.stride * Int(previousCount)

@@ -177,3 +177,42 @@ New:
 Per-category click targets inside the strip; ⌘-draggable independent status items;
 user-defined chart colours; configurable history window; chart styles that need data the
 monitors do not collect.
+
+---
+
+## Addendum — P/E core utilisation (added during implementation)
+
+A fourth request arrived with the go-ahead: the CPU representation must show performance and
+efficiency core utilisation.
+
+The data was collectable but not collected. `CPUMonitor` had `coreUsages` and
+`efficiencyCoreCount` but only ever averaged *every* core into one `usage` — which is precisely
+the number that hides the split, since four pinned P-cores and six idle E-cores average to a
+middling figure describing neither cluster.
+
+Added: `performanceUsage` / `efficiencyUsage` and their own history buffers, fed by
+`clusterAverages(coreUsages:efficiencyCoreCount:)` — `nonisolated` and pure, so the split is
+tested without a Mach call. The kernel reports efficiency cores first, the same convention
+`coreKind(at:)` already relied on, and the count is clamped because it comes from a sysctl that
+need not agree with the core list. `hasCoreSplit` gates all of it: Intel reports no clusters and
+drawing a split there would invent a distinction the hardware does not make.
+
+Surfaced in two places, both of which required `Sparkline` to accept a second series:
+
+- **Dashboard** — `CoreClusterRow`: both readings side by side over one shared chart. Two
+  separate `MetricRow`s would say the same thing at twice the height, and the comparison is the
+  point. A coloured dot precedes each label, so colour is never the only carrier of meaning.
+- **Menu bar** — the CPU segment's mini chart draws P and E as two series on one scale. Scaling
+  them independently would render an idle efficiency cluster as busy as a pinned performance one.
+
+## Implementation notes — two things the design did not predict
+
+**The status item sized itself to nothing.** Pinning the hosting view to the button's four edges
+makes `fittingSize` report the *button's* width, which is itself whatever `statusItem.length` was
+last set to. The loop resolves to zero and leaves an invisible, unclickable item. The hosting view
+must size from its own content and drive the length, not inherit it.
+
+**The strip is wide.** One category with temperature, value, chart and icon measures ~121pt. Five
+would approach 600pt, and on a notched Mac macOS moves the overflow into its hidden section — so
+the strip can be configured into invisibility. The "Show Temperature" and "Show Graph" toggles are
+the mitigation, and the category set is the real control.

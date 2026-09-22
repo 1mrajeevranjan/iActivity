@@ -7,6 +7,8 @@ A native macOS menu bar system monitor — CPU, GPU, memory, disk, battery, and 
 ## Features
 
 - **Six live categories** — CPU, GPU, Memory, Disk, Battery, Network — each with a hero gauge, detail tiles, a history chart, and a top-5 process breakdown.
+- **Four chart styles** — line, area, bars or stepped, chosen once in Settings and applied to the dashboard and the menu bar together.
+- **Performance / efficiency split** — on Apple Silicon the CPU tab reads both clusters separately, over one shared chart. The overall average describes neither cluster on its own.
 - **Native popover presentation** — the dashboard drops from the menu bar icon with a genuine pointed beak, matching Apple's own menu extras. Re-anchors on every open as neighboring menu bar icons shift, and slides its beak to stay aimed at the icon if the panel gets clamped against a screen edge.
 - **Glass pill tab bar** — switching categories slides a shared glass pill under the selection with a spring animation; content transitions in the same direction. Respects Reduce Motion.
 - **Full thermal monitoring** — real-time temperature for every component via SMC, in Celsius or Fahrenheit.
@@ -15,10 +17,13 @@ A native macOS menu bar system monitor — CPU, GPU, memory, disk, battery, and 
   - Show/hide Dock icon
   - Appearance: Light / Dark / Auto
   - Temperature unit: Celsius / Fahrenheit
-  - Menu bar category picker
+  - Chart style: Line / Area / Bars / Stepped
+  - Menu bar categories — any combination, not just one
   - Show/hide temperature in the menu bar
+  - Show/hide graphs in the menu bar
   - Refresh interval: 1s / 2s / 5s
-- **Power-aware by design** — the five categories not shown in the menu bar, and the system-wide process scanner, are fully paused while the dashboard is closed and resume instantly when it's opened. Idle CPU use is a fraction of a percent.
+- **Menu bar, not just a number** — show any combination of the six categories at once, each with its reading and a live mini chart of its recent history.
+- **Power-aware by design** — every category the menu bar is *not* showing, plus the system-wide process scanner, is fully paused while the dashboard is closed and resumes instantly when it's opened. Idle cost scales with how many categories you pin to the menu bar: one is a fraction of a percent, five is five times that.
 - **Accessible** — VoiceOver labels throughout, Reduce Motion and Reduce Transparency respected, Full Keyboard Access, Increase Contrast–aware.
 - **Menu bar only** — no Dock icon by default (optional), launches at login on request.
 
@@ -26,7 +31,7 @@ A native macOS menu bar system monitor — CPU, GPU, memory, disk, battery, and 
 
 On first launch, a welcome screen offers to enable Launch at Login and, if the app isn't already there, move itself to `/Applications`.
 
-- **Left-click** the menu bar icon — toggle the dashboard.
+- **Left-click** the menu bar strip — toggle the dashboard.
 - **Right-click** — Settings…, Quit.
 - **Esc** — closes the Settings window.
 
