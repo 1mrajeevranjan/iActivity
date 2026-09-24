@@ -23,9 +23,9 @@ struct CPUView: View {
     var body: some View {
         VStack(spacing: AppTheme.Metrics.groupSpacing) {
             StatTileRow(tiles: [
-                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.cpu.temperature, decimals: 0)),
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.reading(fromCelsius: monitor.cpu.temperature)),
                 .init(icon: "cpu", label: "Cores", value: "\(monitor.cpu.coreUsages.count)"),
-                .init(icon: "chart.bar.fill", label: "Peak", value: "\(Int((monitor.cpu.history.max() ?? 0) * 100))%"),
+                .init(icon: "chart.bar", label: "Peak", value: "\(Int((monitor.cpu.history.max() ?? 0) * 100))%"),
             ], tint: tint)
 
             CardDivider()
@@ -83,7 +83,7 @@ struct CPUView: View {
 
             CardDivider()
 
-            FactRow(label: "Model", value: monitor.cpu.modelName, icon: "cpu.fill", tint: tint)
+            FactRow(label: "Model", value: monitor.cpu.modelName, icon: "cpu", tint: tint)
         }
     }
 }

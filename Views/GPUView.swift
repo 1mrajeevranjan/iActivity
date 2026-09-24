@@ -9,9 +9,11 @@ struct GPUView: View {
     var body: some View {
         VStack(spacing: AppTheme.Metrics.groupSpacing) {
             StatTileRow(tiles: [
-                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.gpu.temperature, decimals: 0)),
-                .init(icon: "memorychip", label: "VRAM", value: monitor.gpu.vramTotal > 0 ? formatBytes(monitor.gpu.vramTotal) : "Unified"),
-                .init(icon: "chart.bar.fill", label: "Peak", value: "\(Int((monitor.gpu.history.max() ?? 0) * 100))%"),
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.reading(fromCelsius: monitor.gpu.temperature)),
+                // Apple Silicon has no VRAM of its own — show what the GPU holds in unified memory.
+                .init(icon: "memorychip", label: monitor.gpu.vramTotal > 0 ? "VRAM" : "Memory",
+                      value: monitor.gpu.vramTotal > 0 ? formatBytes(monitor.gpu.vramTotal) : formatBytes(monitor.gpu.vramUsed)),
+                .init(icon: "chart.bar", label: "Peak", value: "\(Int((monitor.gpu.history.max() ?? 0) * 100))%"),
             ], tint: tint)
 
             CardDivider()
@@ -32,7 +34,8 @@ struct GPUView: View {
             CardDivider()
 
             VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Top processes")
+                // macOS exposes no public per-process GPU time, so this is honest about ranking by CPU.
+                GroupLabel(text: "Top processes by CPU")
                 TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
             }
 
@@ -43,7 +46,7 @@ struct GPUView: View {
                 FactRow(
                     label: "Status",
                     value: monitor.gpu.utilization > 0.8 ? "High load" : "Normal",
-                    icon: "bolt.fill",
+                    icon: "bolt",
                     tint: monitor.gpu.utilization > 0.8 ? .orange : tint
                 )
             }
@@ -52,7 +55,7 @@ struct GPUView: View {
 
     private func formatBytes(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useGB]
+        formatter.allowedUnits = [.useGB, .useMB]
         formatter.countStyle = .memory
         formatter.allowsNonnumericFormatting = false
         return formatter.string(fromByteCount: bytes)

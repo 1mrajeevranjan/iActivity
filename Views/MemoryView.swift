@@ -6,21 +6,22 @@ struct MemoryView: View {
 
     private var tint: Color { AppTheme.Colors.accentColor(for: .memory) }
 
-    /// Wired + compressed is what macOS itself treats as pressure; anything above ~75% of total
-    /// is where the system starts swapping in earnest.
+    /// The kernel's pressure level, as Activity Monitor colours its graph — not a threshold on
+    /// used memory, which stays high on a healthy Mac because macOS fills spare RAM with cache.
     private var pressure: (label: String, color: Color) {
-        let used = monitor.memory.usagePercentage
-        if used >= 0.9 { return ("High", .red) }
-        if used >= 0.75 { return ("Elevated", .orange) }
-        return ("Normal", AppTheme.Colors.batteryGreen)
+        switch monitor.memory.pressure {
+        case .critical: return ("Critical", .red)
+        case .warning: return ("Warning", .orange)
+        case .normal: return ("Normal", AppTheme.Colors.batteryGreen)
+        }
     }
 
     var body: some View {
         VStack(spacing: AppTheme.Metrics.groupSpacing) {
             StatTileRow(tiles: [
-                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.memory.temperature, decimals: 0)),
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.reading(fromCelsius: monitor.memory.temperature)),
                 .init(icon: "memorychip", label: "Total", value: formatBytes(Int64(monitor.memory.total))),
-                .init(icon: "tray.fill", label: "Free", value: formatBytes(Int64(monitor.memory.free + monitor.memory.inactive))),
+                .init(icon: "tray", label: "Available", value: formatBytes(Int64(max(monitor.memory.total - monitor.memory.used, 0)))),
             ], tint: tint)
 
             CardDivider()
@@ -37,7 +38,7 @@ struct MemoryView: View {
                 }
 
                 MetricRow(
-                    label: "Pressure",
+                    label: "Used",
                     value: "\(Int(monitor.memory.usagePercentage * 100))%",
                     fraction: monitor.memory.usagePercentage,
                     tint: tint,
@@ -50,10 +51,12 @@ struct MemoryView: View {
 
             VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
                 GroupLabel(text: "Composition")
+                // Same breakdown as Activity Monitor: the first three sum to "Used".
+                CompositionRow(label: "App", value: formatBytes(Int64(monitor.memory.appMemory)), fraction: share(monitor.memory.appMemory), tint: tint)
                 CompositionRow(label: "Wired", value: formatBytes(Int64(monitor.memory.wired)), fraction: share(monitor.memory.wired), tint: .purple)
-                CompositionRow(label: "Active", value: formatBytes(Int64(monitor.memory.active)), fraction: share(monitor.memory.active), tint: tint)
                 CompositionRow(label: "Compressed", value: formatBytes(Int64(monitor.memory.compressed)), fraction: share(monitor.memory.compressed), tint: .orange)
-                CompositionRow(label: "Free", value: formatBytes(Int64(monitor.memory.free)), fraction: share(monitor.memory.free), tint: .secondary)
+                CompositionRow(label: "Cached", value: formatBytes(Int64(monitor.memory.cached)), fraction: share(monitor.memory.cached), tint: .teal)
+                CompositionRow(label: "Swap", value: formatBytes(Int64(monitor.memory.swapUsed)), fraction: share(monitor.memory.swapUsed), tint: .secondary)
             }
 
             CardDivider()

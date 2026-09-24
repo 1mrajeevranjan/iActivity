@@ -59,20 +59,6 @@ extension View {
     }
 }
 
-/// All-caps eyebrow above the card, e.g. "CPU".
-struct SectionHeader: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.caption.weight(.bold))
-            .tracking(0.7)
-            .textCase(.uppercase)
-            .foregroundStyle(.secondary)
-            .accessibilityAddTraits(.isHeader)
-    }
-}
-
 /// Sentence-case label introducing a group of rows inside the card, e.g. "Hardware usage".
 struct GroupLabel: View {
     let text: String

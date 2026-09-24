@@ -44,17 +44,16 @@ class DiskMonitor {
     }
 
     private func updateUsage() {
-        let fileManager = FileManager.default
-        do {
-            let values = try fileManager.attributesOfFileSystem(forPath: "/")
-            if let totalSize = values[.systemSize] as? Int64,
-               let freeSize = values[.systemFreeSize] as? Int64 {
-                self.total = totalSize
-                self.free = freeSize
-                self.used = totalSize - freeSize
-                self.usagePercentage = totalSize > 0 ? Double(self.used) / Double(totalSize) : 0
-            }
-        } catch {}
+        // Finder's "Available" counts purgeable space (caches, local snapshots) that macOS frees
+        // on demand; `systemFreeSize` does not, so it understated free space by tens of GB.
+        let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
+        guard let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys),
+              let totalSize = values.volumeTotalCapacity,
+              let freeSize = values.volumeAvailableCapacityForImportantUsage else { return }
+        self.total = Int64(totalSize)
+        self.free = freeSize
+        self.used = max(self.total - freeSize, 0)
+        self.usagePercentage = self.total > 0 ? Double(self.used) / Double(self.total) : 0
     }
 
     private func updateIOStats() {
@@ -75,11 +74,11 @@ class DiskMonitor {
                 if IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == kIOReturnSuccess,
                    let dict = props?.takeRetainedValue() as? [String: Any],
                    let stats = dict["Statistics"] as? [String: Any] {
-                    if let bytesRead = stats["Bytes (Read)"] as? Int64 {
-                        read += bytesRead
+                    if let bytesRead = stats["Bytes (Read)"] as? NSNumber {
+                        read += bytesRead.int64Value
                     }
-                    if let bytesWritten = stats["Bytes (Write)"] as? Int64 {
-                        write += bytesWritten
+                    if let bytesWritten = stats["Bytes (Write)"] as? NSNumber {
+                        write += bytesWritten.int64Value
                     }
                 }
                 IOObjectRelease(service)
@@ -92,8 +91,10 @@ class DiskMonitor {
         let interval = now.timeIntervalSince(lastUpdate)
         
         if lastReadBytes > 0 && interval > 0 {
-            readSpeed = Double(read - lastReadBytes) / interval
-            writeSpeed = Double(write - lastWriteBytes) / interval
+            // A drive unmounting mid-interval drops its counters from the sum; clamp so that reads
+            // as idle rather than a negative speed.
+            readSpeed = Double(max(read - lastReadBytes, 0)) / interval
+            writeSpeed = Double(max(write - lastWriteBytes, 0)) / interval
             
             readHistory.removeFirst()
             readHistory.append(readSpeed)

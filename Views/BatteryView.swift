@@ -1,4 +1,5 @@
 import SwiftUI
+import IOKit.ps
 
 struct BatteryView: View {
     @Environment(SystemMonitor.self) private var monitor
@@ -14,8 +15,8 @@ struct BatteryView: View {
     var body: some View {
         VStack(spacing: AppTheme.Metrics.groupSpacing) {
             StatTileRow(tiles: [
-                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.battery.temperature, decimals: 0)),
-                .init(icon: "heart.fill", label: "Health", value: monitor.battery.healthPercentage > 0 ? String(format: "%.0f%%", monitor.battery.healthPercentage) : "—"),
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.reading(fromCelsius: monitor.battery.temperature)),
+                .init(icon: "heart", label: "Health", value: monitor.battery.healthPercentage > 0 ? String(format: "%.0f%%", monitor.battery.healthPercentage) : "—"),
                 .init(icon: "arrow.triangle.2.circlepath", label: "Cycles", value: monitor.battery.cycleCount > 0 ? String(monitor.battery.cycleCount) : "—"),
             ], tint: tint)
 
@@ -47,11 +48,11 @@ struct BatteryView: View {
                 GroupLabel(text: "Power")
                 FactRow(
                     label: monitor.battery.isCharging ? "Time to full" : "Time to empty",
-                    value: formatTime(monitor.battery.isCharging ? monitor.battery.timeToFull : monitor.battery.timeToEmpty),
+                    value: timeRemaining,
                     icon: "clock",
                     tint: tint
                 )
-                FactRow(label: "Draw", value: String(format: "%.1f W", monitor.battery.watts), icon: "bolt.fill", tint: .yellow)
+                FactRow(label: "Draw", value: String(format: "%.1f W", monitor.battery.watts), icon: "bolt", tint: .yellow)
             }
 
             CardDivider()
@@ -61,6 +62,16 @@ struct BatteryView: View {
                 TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
             }
         }
+    }
+
+    /// On AC without charging (full, or held by Optimized Charging) the battery isn't emptying,
+    /// so there is no time to show — IOKit reports -1 there, which used to read "Calculating…"
+    /// forever.
+    private var timeRemaining: String {
+        let battery = monitor.battery
+        if battery.isCharging { return formatTime(battery.timeToFull) }
+        if battery.powerSource == kIOPSACPowerValue { return "Not charging" }
+        return formatTime(battery.timeToEmpty)
     }
 
     private func shortPowerSource(_ raw: String) -> String {

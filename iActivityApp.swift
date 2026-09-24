@@ -79,6 +79,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showSettings() {
+        // The dashboard is a floating-level panel, so a normal window opened while it is up
+        // lands behind it. Settings replaces the dashboard, the way a menu extra's own
+        // "Settings…" item dismisses its popover.
+        panelManager?.close()
+
         if settingsWindow == nil {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 420, height: 540),

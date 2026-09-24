@@ -48,7 +48,7 @@ struct NetworkView: View {
                 GroupLabel(text: "Peaks")
                 FactRow(label: "Peak down", value: formatSpeed(monitor.network.downloadHistory.max() ?? 0), icon: "arrow.down.to.line", tint: AppTheme.Colors.brandBlue)
                 FactRow(label: "Peak up", value: formatSpeed(monitor.network.uploadHistory.max() ?? 0), icon: "arrow.up.to.line", tint: AppTheme.Colors.batteryGreen)
-                FactRow(label: "Interface", value: monitor.network.primaryInterfaceName, icon: "wifi", tint: tint)
+                FactRow(label: "Interface", value: monitor.network.primaryInterfaceName, icon: "network", tint: tint)
             }
 
             CardDivider()
