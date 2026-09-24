@@ -23,7 +23,13 @@ fi
 # 2. Update App Bundle
 echo "📦 Updating $APP_NAME.app bundle..."
 mkdir -p "$APP_NAME.app/Contents/MacOS"
-cp ".build/apple/Products/Release/$APP_NAME" "$APP_NAME.app/Contents/MacOS/"
+# Ask SwiftPM where it put the universal binary — the path has moved between toolchains, and a
+# hardcoded one failed silently, packaging whatever stale binary the bundle already held.
+BIN_PATH="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
+if ! cp "$BIN_PATH/$APP_NAME" "$APP_NAME.app/Contents/MacOS/"; then
+    echo "❌ Error: could not copy binary from $BIN_PATH."
+    exit 1
+fi
 
 # 3. Prepare DMG Staging
 echo "📂 Preparing staging directory..."
