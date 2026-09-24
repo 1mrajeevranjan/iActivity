@@ -45,12 +45,16 @@ struct MenuBarLabel: View {
             if let temperature = temperatureText(for: category) {
                 // `.primary`, not `.secondary` — the dimmer tone reads as near-invisible against
                 // the menu bar's translucent, wallpaper-varying backdrop.
-                Text(temperature)
-                    .foregroundStyle(.primary)
+                Self.reserving(widest: temperatureUnit.string(fromCelsius: 100, decimals: 0)) {
+                    Text(temperature)
+                        .foregroundStyle(.primary)
+                }
             }
 
-            Text(valueText(for: category))
-                .foregroundStyle(status(for: category).color)
+            Self.reserving(widest: widestValueText(for: category)) {
+                Text(valueText(for: category))
+                    .foregroundStyle(status(for: category).color)
+            }
 
             if showGraph {
                 chart(for: category)
@@ -80,6 +84,28 @@ struct MenuBarLabel: View {
     }
 
     private func percent(_ fraction: Double) -> String { "\(Int(fraction * 100))%" }
+
+    /// The widest this segment's value can get. The status item's width is only reconciled once
+    /// a second, so a value that grew in between ("9%" → "10%") used to be cut off as "1…" until
+    /// the next sync. Sizing every segment for its widest value keeps the strip's width constant.
+    private func widestValueText(for category: MetricCategory) -> String {
+        switch category {
+        case .network: return "↓999.9M ↑999.9M"
+        default: return "100%"
+        }
+    }
+
+    /// Lays `content` out in the space `widest` would take, right-aligned (digits are monospaced),
+    /// and never truncates it.
+    private static func reserving(widest: String, @ViewBuilder content: () -> some View) -> some View {
+        Text(widest)
+            .hidden()
+            .overlay(alignment: .trailing) {
+                content()
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+    }
 
     /// The menu bar's own compact formatter — deliberately not the dashboard's "42.1 MB/s",
     /// which is far too wide for a strip that may be holding five categories at once.
@@ -117,13 +143,13 @@ struct MenuBarLabel: View {
 
     private func iconName(for category: MetricCategory) -> String {
         guard category == .battery else { return category.icon }
-        if monitor.battery.isCharging { return "battery.100.bolt" }
+        if monitor.battery.isCharging { return "battery.100percent.bolt" }
         switch monitor.battery.level {
-        case 81...: return "battery.100"
-        case 51...80: return "battery.75"
-        case 26...50: return "battery.50"
-        case 11...25: return "battery.25"
-        default: return "battery.0"
+        case 81...: return "battery.100percent"
+        case 51...80: return "battery.75percent"
+        case 26...50: return "battery.50percent"
+        case 11...25: return "battery.25percent"
+        default: return "battery.0percent"
         }
     }
 

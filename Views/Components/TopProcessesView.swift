@@ -12,12 +12,17 @@ struct TopProcessesView: View {
     enum Metric {
         case cpu
         case memory
+        case disk
     }
 
     private var rows: [ProcessMonitor.ProcessEntry] { Array(processes.prefix(5)) }
 
     private func amount(_ process: ProcessMonitor.ProcessEntry) -> Double {
-        metric == .cpu ? process.cpuPercent : process.memoryMB
+        switch metric {
+        case .cpu: process.cpuPercent
+        case .memory: process.memoryMB
+        case .disk: process.diskBytesPerSecond
+        }
     }
 
     /// Bars scale against the largest value **in the same unit**. Dividing every row by the top
@@ -26,7 +31,14 @@ struct TopProcessesView: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            if rows.isEmpty {
+            if rows.isEmpty && metric == .disk {
+                // Unlike CPU, an idle disk genuinely has nothing to rank.
+                Text("No disk activity")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+            } else if rows.isEmpty {
                 HStack {
                     Spacer()
                     ProgressView().controlSize(.small)
@@ -43,7 +55,11 @@ struct TopProcessesView: View {
     }
 
     private func row(_ process: ProcessMonitor.ProcessEntry) -> some View {
-        let display = metric == .cpu ? formatCPU(process.cpuPercent) : formatMemory(process.memoryMB)
+        let display = switch metric {
+        case .cpu: formatCPU(process.cpuPercent)
+        case .memory: formatMemory(process.memoryMB)
+        case .disk: formatRate(process.diskBytesPerSecond)
+        }
         let fraction = amount(process) / peak
 
         return HStack(spacing: 8) {
@@ -75,6 +91,12 @@ struct TopProcessesView: View {
 
     private func formatCPU(_ value: Double) -> String {
         String(format: "%.1f%%", value)
+    }
+
+    private func formatRate(_ bytesPerSecond: Double) -> String {
+        if bytesPerSecond >= 1_000_000 { return String(format: "%.1f MB/s", bytesPerSecond / 1_000_000) }
+        if bytesPerSecond >= 1_000 { return String(format: "%.0f KB/s", bytesPerSecond / 1_000) }
+        return String(format: "%.0f B/s", bytesPerSecond)
     }
 
     private func formatMemory(_ mb: Double) -> String {

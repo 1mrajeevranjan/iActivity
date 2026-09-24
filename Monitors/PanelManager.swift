@@ -41,8 +41,9 @@ class PanelManager: ObservableObject {
         }
     }
 
-    private func close() {
-        panel?.orderOut(nil)
+    func close() {
+        guard let panel, panel.isVisible else { return }
+        panel.orderOut(nil)
         // Closed: only the menu bar's own category still needs live data. The other five
         // monitors and the full-system process scan have nothing left to feed.
         monitor.pauseBackground()

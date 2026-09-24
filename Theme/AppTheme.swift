@@ -69,7 +69,7 @@ enum AppTheme {
         static let barHeight: CGFloat = 6
         static let sparklineHeight: CGFloat = 34
         static let tileHeight: CGFloat = 46
-        static let tabHeight: CGFloat = 38
+        static let tabHeight: CGFloat = 50
         static let footerHeight: CGFloat = 30
         static let iconColumn: CGFloat = 16
     }
@@ -120,17 +120,12 @@ enum MetricCategory: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .cpu: return "cpu"
-        case .gpu: return "square.grid.3x3.fill"
+        case .gpu: return "display"
         case .memory: return "memorychip"
         case .disk: return "internaldrive"
-        case .battery: return "bolt.fill"
-        case .network: return "globe"
+        case .battery: return "battery.100percent"
+        case .network: return "network"
         }
-    }
-
-    /// All-caps form, for the eyebrow label above the card.
-    var title: String {
-        self.rawValue.uppercased()
     }
 
     /// Sentence-case name for anything a person reads as prose: VoiceOver, menus, Settings.
@@ -219,6 +214,12 @@ enum TemperatureUnit: String, CaseIterable, Identifiable {
         case .celsius: return "°C"
         case .fahrenheit: return "°F"
         }
+    }
+
+    /// A sensor reading for display. The monitors report 0 for a component this Mac has no
+    /// sensor for, and that shows as a dash — never as a fabricated temperature.
+    func reading(fromCelsius celsius: Double) -> String {
+        celsius > 0 ? string(fromCelsius: celsius, decimals: 0) : "—"
     }
 
     func string(fromCelsius celsius: Double, decimals: Int = 1) -> String {

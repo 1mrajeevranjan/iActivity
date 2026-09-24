@@ -84,10 +84,6 @@ struct MainDashboardView: View {
                     categoryTabs
                         .padding(.horizontal, gutter)
                         .padding(.bottom, 10)
-
-                    eyebrow
-                        .padding(.horizontal, gutter + 2)
-                        .padding(.bottom, 6)
                 }
                 .measureHeight(ChromeHeightKey.self)
 
@@ -159,27 +155,6 @@ struct MainDashboardView: View {
         .padding(.top, 10)
         .padding(.bottom, 10)
         .accessibilityHidden(true)
-    }
-
-    // MARK: - Eyebrow (category name + settings)
-
-    private var eyebrow: some View {
-        HStack {
-            SectionHeader(text: selectedCategory.title)
-            Spacer()
-            Button {
-                AppDelegate.shared?.showSettings()
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .pointerOnHover()
-            .help(Text("Settings"))
-            .accessibilityLabel(Text("Settings"))
-        }
     }
 
     // MARK: - Category tabs (icon-only, filled selection)
@@ -269,8 +244,14 @@ private struct CategoryTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: category.icon)
-                .font(.system(size: 14, weight: .medium))
+            VStack(spacing: 3) {
+                Image(systemName: category.icon)
+                    .font(.system(size: 14, weight: .medium))
+                Text(category.displayName)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
                 .foregroundStyle(isSelected ? Color.white : .secondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: AppTheme.Metrics.tabHeight - 6)

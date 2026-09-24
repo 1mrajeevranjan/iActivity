@@ -12,8 +12,12 @@ class NetworkMonitor {
     var primaryInterfaceName: String = "—"
     var isConnected: Bool = false
     
-    private var lastInBytes: UInt64 = 0
-    private var lastOutBytes: UInt64 = 0
+    private var lastInBytes: UInt32 = 0
+    private var lastOutBytes: UInt32 = 0
+    /// Switching Wi-Fi ↔ Ethernet swaps in another interface's counters; diffing across the
+    /// switch would report a bogus multi-GB spike, so the first tick after one only re-baselines.
+    private var lastInterface = ""
+    private var hasBaseline = false
     private var lastTime: Date = Date()
     private var timer: Timer?
     private var currentInterval: TimeInterval = 1.0
@@ -51,16 +55,18 @@ class NetworkMonitor {
         guard getifaddrs(&ifaddr) == 0 else { return }
         defer { freeifaddrs(ifaddr) }
 
-        var totalInBytes: UInt64 = 0
-        var totalOutBytes: UInt64 = 0
+        // `if_data` counters are 32-bit and wrap every 4 GB — seconds apart on a fast link.
+        // Wrapping subtraction below turns a wrap into the correct small delta instead of a zero.
+        var totalInBytes: UInt32 = 0
+        var totalOutBytes: UInt32 = 0
 
         var ptr = ifaddr
         while ptr != nil {
             let interface = ptr!.pointee
             if String(cString: interface.ifa_name) == primary, let data = interface.ifa_data {
                 let ifData = data.assumingMemoryBound(to: if_data.self)
-                totalInBytes += UInt64(ifData.pointee.ifi_ibytes)
-                totalOutBytes += UInt64(ifData.pointee.ifi_obytes)
+                totalInBytes = ifData.pointee.ifi_ibytes
+                totalOutBytes = ifData.pointee.ifi_obytes
             }
             ptr = interface.ifa_next
         }
@@ -71,9 +77,9 @@ class NetworkMonitor {
         let now = Date()
         let interval = now.timeIntervalSince(lastTime)
         
-        if lastInBytes > 0 && interval > 0 {
-            let inDelta = totalInBytes >= lastInBytes ? totalInBytes - lastInBytes : 0
-            let outDelta = totalOutBytes >= lastOutBytes ? totalOutBytes - lastOutBytes : 0
+        if hasBaseline && primary == lastInterface && interval > 0 {
+            let inDelta = totalInBytes &- lastInBytes
+            let outDelta = totalOutBytes &- lastOutBytes
             
             self.downloadSpeed = Double(inDelta) / interval
             self.uploadSpeed = Double(outDelta) / interval
@@ -86,6 +92,8 @@ class NetworkMonitor {
         
         self.lastInBytes = totalInBytes
         self.lastOutBytes = totalOutBytes
+        self.lastInterface = primary
+        self.hasBaseline = true
         self.lastTime = now
     }
 

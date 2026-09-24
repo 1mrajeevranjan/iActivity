@@ -9,9 +9,9 @@ struct DiskView: View {
     var body: some View {
         VStack(spacing: AppTheme.Metrics.groupSpacing) {
             StatTileRow(tiles: [
-                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.string(fromCelsius: monitor.disk.temperature, decimals: 0)),
+                .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.reading(fromCelsius: monitor.disk.temperature)),
                 .init(icon: "internaldrive", label: "Size", value: formatBytes(monitor.disk.total)),
-                .init(icon: "tray.fill", label: "Free", value: formatBytes(monitor.disk.free)),
+                .init(icon: "tray", label: "Free", value: formatBytes(monitor.disk.free)),
             ], tint: tint)
 
             CardDivider()
@@ -50,7 +50,7 @@ struct DiskView: View {
 
             VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
                 GroupLabel(text: "Most active processes")
-                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                TopProcessesView(processes: monitor.processes.topByDisk, metric: .disk, tint: tint)
             }
         }
     }

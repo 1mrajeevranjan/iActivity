@@ -11,11 +11,36 @@ class MemoryMonitor {
     var inactive: Double = 0
     var wired: Double = 0
     var compressed: Double = 0
+    var appMemory: Double = 0
+    var cached: Double = 0
+    var swapUsed: Double = 0
+    var pressure: Pressure = .normal
     var usageHistory: [Double] = Array(repeating: 0, count: 60)
     var temperature: Double = 0
 
     var usagePercentage: Double {
         total > 0 ? used / total : 0
+    }
+
+    /// The kernel's own memory-pressure verdict — the same signal Activity Monitor's pressure
+    /// graph colours by. Used percentage alone says nothing about pressure: a Mac at 95% used
+    /// with plenty of reclaimable cache is not under pressure at all.
+    enum Pressure: Int {
+        case normal = 1, warning = 2, critical = 4
+    }
+
+    private static func pressureLevel() -> Pressure {
+        var level: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &size, nil, 0) == 0 else { return .normal }
+        return Pressure(rawValue: Int(level)) ?? .normal
+    }
+
+    private static func swapUsage() -> Double {
+        var usage = xsw_usage()
+        var size = MemoryLayout<xsw_usage>.size
+        guard sysctlbyname("vm.swapusage", &usage, &size, nil, 0) == 0 else { return 0 }
+        return Double(usage.xsu_used)
     }
 
     private var timer: Timer?
@@ -66,8 +91,17 @@ class MemoryMonitor {
         self.wired = Double(stats.wire_count) * pageSize
         self.compressed = Double(stats.compressor_page_count) * pageSize
         self.free = Double(stats.free_count) * pageSize
+        // Activity Monitor's breakdown: App Memory is anonymous memory that can't simply be
+        // dropped, Cached Files is file-backed or purgeable memory the system reclaims on demand.
+        // "Memory Used" is App + Wired + Compressed — counting all of `active` (as this used to)
+        // included file cache and overstated usage by gigabytes.
+        let purgeable = Double(stats.purgeable_count) * pageSize
+        self.appMemory = max(Double(stats.internal_page_count) * pageSize - purgeable, 0)
+        self.cached = Double(stats.external_page_count) * pageSize + purgeable
 
-        self.used = active + wired + compressed
+        self.used = appMemory + wired + compressed
+        self.pressure = Self.pressureLevel()
+        self.swapUsed = Self.swapUsage()
 
         self.usageHistory.removeFirst()
         self.usageHistory.append(usagePercentage)

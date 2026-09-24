@@ -210,10 +210,7 @@ class CPUMonitor {
         
         guard result == KERN_SUCCESS, let processorInfo = processorInfo else { return }
         
-        // Update temperature from SMCHelper
-        if let temp = SMCHelper.readTemperature("TC0P") {
-            self.temperature = temp
-        }
+        self.temperature = SMCHelper.cpuTemperature()
         
         var totalUsage: Double = 0
         var coreUsages: [Double] = []

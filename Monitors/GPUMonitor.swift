@@ -43,7 +43,9 @@ class GPUMonitor {
         temperature = SMCHelper.gpuTemperature()
 
         // Query IOKit for "AGXAccelerator" or similar GPU service
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AGXAccelerator"))
+        // AGXAccelerator on Apple Silicon; IOAccelerator matches every GPU driver including Intel/AMD.
+        var service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AGXAccelerator"))
+        if service == 0 { service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOAccelerator")) }
         if service == 0 { return }
         defer { IOObjectRelease(service) }
 
@@ -51,16 +53,23 @@ class GPUMonitor {
         guard IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == kIOReturnSuccess,
               let propsDict = props?.takeRetainedValue() as? [String: Any] else { return }
 
-        // PerformanceStatistics is the standard key for GPU load
+        // PerformanceStatistics is the standard key for GPU load. Read through NSNumber: a bare
+        // `as? Int64` fails whenever the registry stores the value as a different width.
         if let stats = propsDict["PerformanceStatistics"] as? [String: Any] {
-            if let util = stats["Device Utilization %"] as? Int64 {
-                self.utilization = Double(util) / 100.0
+            if let util = stats["Device Utilization %"] as? NSNumber {
+                self.utilization = min(max(util.doubleValue / 100.0, 0), 1)
+            }
+            // Unified memory: what the GPU driver currently has resident in system RAM.
+            if let inUse = stats["In use system memory"] as? NSNumber {
+                self.vramUsed = inUse.int64Value
             }
         }
 
-        // For VRAM, on M-series chips, it's unified memory
-        if let vram = propsDict["VRAM,total-size"] as? Int64 {
-            self.vramTotal = vram
+        // Discrete GPUs (Intel Macs) report dedicated VRAM here; Apple Silicon has none.
+        if let vram = propsDict["VRAM,totalMB"] as? NSNumber {
+            self.vramTotal = vram.int64Value * 1024 * 1024
+        } else if let vram = propsDict["VRAM,total-size"] as? NSNumber {
+            self.vramTotal = vram.int64Value
         }
 
         self.history.removeFirst()
