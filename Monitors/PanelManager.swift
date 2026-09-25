@@ -44,6 +44,11 @@ class PanelManager: ObservableObject {
     func close() {
         guard let panel, panel.isVisible else { return }
         panel.orderOut(nil)
+        // An ordered-out window's SwiftUI still observes the monitors and re-evaluates every
+        // view on each tick, so a closed dashboard kept rendering (and re-ranking processes) in
+        // the background. Dropping the view tree stops that and frees its memory; `show()`
+        // rebuilds it.
+        panel.contentView = nil
         // Closed: only the menu bar's own category still needs live data. The other five
         // monitors and the full-system process scan have nothing left to feed.
         monitor.pauseBackground()
@@ -52,6 +57,7 @@ class PanelManager: ObservableObject {
 
     func show() {
         let panel = self.panel ?? createPanel()
+        if panel.contentView == nil { panel.contentView = makeContentView() }
         // Every tab (and its process list) is reachable once the panel is open.
         monitor.resumeAll()
         // Re-anchor on every open: the icon moves as neighbouring menu extras come and go.
@@ -129,10 +135,6 @@ class PanelManager: ObservableObject {
 
     @discardableResult
     private func createPanel() -> NSPanel {
-        let contentView = MainDashboardView()
-            .environment(monitor)
-            .environment(anchor)
-
         let newPanel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: AppTheme.Panel.windowWidth, height: AppTheme.Panel.windowHeight),
             styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
@@ -151,7 +153,7 @@ class PanelManager: ObservableObject {
         // Anchored to the menu bar icon like a native menu extra — dragging it away would
         // leave the beak pointing at nothing.
         newPanel.isMovableByWindowBackground = false
-        newPanel.contentView = NSHostingView(rootView: contentView)
+        newPanel.contentView = makeContentView()
 
         self.panel = newPanel
 
@@ -161,6 +163,10 @@ class PanelManager: ObservableObject {
         }
 
         return newPanel
+    }
+
+    private func makeContentView() -> NSView {
+        NSHostingView(rootView: MainDashboardView().environment(monitor).environment(anchor))
     }
 
     /// Grows or shrinks the panel to the current tab's actual content height, keeping the top

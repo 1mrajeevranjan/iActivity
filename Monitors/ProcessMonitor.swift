@@ -7,7 +7,9 @@ import Observation
 class ProcessMonitor {
     
     struct ProcessEntry: Identifiable, Sendable {
-        let id = UUID()
+        /// The pid, so a process keeps its row across refreshes instead of every row being
+        /// rebuilt as new each time.
+        var id: Int32 { pid }
         let pid: Int32
         let name: String
         let cpuPercent: Double
@@ -23,33 +25,25 @@ class ProcessMonitor {
         let time: Double
     }
     
-    var processes: [ProcessEntry] = []
+    /// Top 5 by each measure, ranked off the main thread once per sample. Sorting the full
+    /// process list inside a getter re-sorted ~700 entries on every view refresh.
+    private(set) var topByCPU: [ProcessEntry] = []
+    private(set) var topByDisk: [ProcessEntry] = []
+    private(set) var topByMemory: [ProcessEntry] = []
     private var timer: Timer?
     
     // MARK: - Previous CPU snapshot for delta calculation
     private var prevSnapshot: [Int32: Sample] = [:]
-    
-    // MARK: - Top 5 sorted views
-    
-    var topByCPU: [ProcessEntry] {
-        Array(processes
-            .filter { $0.cpuPercent > 0 }
-            .sorted { $0.cpuPercent > $1.cpuPercent }
-            .prefix(5))
-    }
-    
-    var topByDisk: [ProcessEntry] {
-        Array(processes
-            .filter { $0.diskBytesPerSecond > 0 }
-            .sorted { $0.diskBytesPerSecond > $1.diskBytesPerSecond }
-            .prefix(5))
-    }
 
-    var topByMemory: [ProcessEntry] {
-        Array(processes
-            .filter { $0.memoryMB > 1 }
-            .sorted { $0.memoryMB > $1.memoryMB }
-            .prefix(5))
+    nonisolated static func rank(_ processes: [ProcessEntry]) -> (cpu: [ProcessEntry], disk: [ProcessEntry], memory: [ProcessEntry]) {
+        func top(_ keep: (ProcessEntry) -> Bool, by value: (ProcessEntry) -> Double) -> [ProcessEntry] {
+            Array(processes.filter(keep).sorted { value($0) > value($1) }.prefix(5))
+        }
+        return (
+            top({ $0.cpuPercent > 0 }, by: \.cpuPercent),
+            top({ $0.diskBytesPerSecond > 0 }, by: \.diskBytesPerSecond),
+            top({ $0.memoryMB > 1 }, by: \.memoryMB)
+        )
     }
     
     // MARK: - Lifecycle
@@ -60,10 +54,9 @@ class ProcessMonitor {
         doFetch()
         // Then every 5 seconds
         timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.doFetch()
-            }
+            MainActor.assumeIsolated { self?.doFetch() }
         }
+        timer?.tolerance = 0.5
     }
     
     func stop() {
@@ -75,12 +68,15 @@ class ProcessMonitor {
     
     private func doFetch() {
         let snapshot = self.prevSnapshot
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             let (entries, newSnapshot) = Self.fetchAll(prevSnapshot: snapshot)
+            let rankings = Self.rank(entries)
             DispatchQueue.main.async {
                 self.prevSnapshot = newSnapshot
-                self.processes = entries
+                self.topByCPU = rankings.cpu
+                self.topByDisk = rankings.disk
+                self.topByMemory = rankings.memory
             }
         }
     }
