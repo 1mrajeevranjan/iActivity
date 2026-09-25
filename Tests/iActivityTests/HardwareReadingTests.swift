@@ -44,4 +44,26 @@ struct HardwareReadingTests {
         #expect(TemperatureUnit.celsius.reading(fromCelsius: 0) == "—")
         #expect(TemperatureUnit.celsius.reading(fromCelsius: 47.6) == "48°C")
     }
+
+    @Test("Process rankings keep the top five per measure and drop idle entries")
+    func processRankings() {
+        let entries = (1...8).map { (n: Int) -> ProcessMonitor.ProcessEntry in
+            let disk: Double = n == 3 ? 500 : 0
+            return ProcessMonitor.ProcessEntry(
+                pid: Int32(n), name: "p\(n)",
+                cpuPercent: Double(n * 3 % 8), memoryMB: Double(n * 10), diskBytesPerSecond: disk
+            )
+        }
+        let ranked = ProcessMonitor.rank(entries)
+        #expect(ranked.cpu.map { $0.pid } == [5, 2, 7, 4, 1])
+        #expect(ranked.memory.map { $0.pid } == [8, 7, 6, 5, 4])
+        #expect(ranked.disk.map { $0.pid } == [3])
+    }
+
+    @Test("CPU tick counters that wrap past Int32.max yield the small true delta")
+    func cpuTickWrap() {
+        #expect(CPUMonitor.tickDelta(Int32.min + 4, Int32.max - 5) == 10)
+        #expect(CPUMonitor.tickDelta(-2, -12) == 10)
+        #expect(CPUMonitor.tickDelta(250, 100) == 150)
+    }
 }

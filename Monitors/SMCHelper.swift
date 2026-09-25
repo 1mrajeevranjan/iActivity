@@ -16,6 +16,15 @@ enum SMCHelper {
     /// Every temperature key on this machine, with the byte size and type each read needs.
     private static var temperatureKeys: [(key: UInt32, name: String, info: KeyInfo)]?
 
+    /// Set by `SystemMonitor`. With the dashboard closed, the menu bar's temperature toggle is
+    /// the only thing on screen that shows a reading. Each reading is one SMC round-trip per
+    /// sensor — dozens per category — and was the largest idle cost with temperatures hidden.
+    static var isDashboardVisible = false
+
+    private static var isReadingNeeded: Bool {
+        isDashboardVisible || (UserDefaults.standard.object(forKey: "showTemperature") as? Bool ?? true)
+    }
+
     // MARK: - Per-component readings (°C, 0 when the machine has no such sensor)
 
     static func cpuTemperature() -> Double { average(prefixes: ["Tp", "Te"], fallback: ["TC"]) }
@@ -25,6 +34,7 @@ enum SMCHelper {
     static func batteryTemperature() -> Double { average(prefixes: ["TB"]) }
 
     private static func average(prefixes: [String], fallback: [String] = []) -> Double {
+        guard isReadingNeeded else { return 0 }
         let primary = readings(prefixes: prefixes)
         let values = primary.isEmpty ? readings(prefixes: fallback) : primary
         guard !values.isEmpty else { return 0 }

@@ -20,15 +20,21 @@ class DiskMonitor {
     private var lastWriteBytes: Int64 = 0
     private var lastUpdate: Date = Date()
     private var currentInterval: TimeInterval = 1.0
+    /// The capacity query costs ~10 ms (it asks the system to total purgeable space), and free
+    /// space moves slowly — so it runs on every start and then at most this often, not per tick.
+    private static let usageRefreshInterval: TimeInterval = 30
+    private var lastUsageRefresh: Date = .distantPast
 
     func start(interval: TimeInterval? = nil) {
         stop()
         if let interval { currentInterval = interval }
+        lastUsageRefresh = .distantPast
+        // Scheduled on the main run loop, so the callback is already on the main actor. The
+        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
         timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.update()
-            }
+            MainActor.assumeIsolated { self?.update() }
         }
+        timer?.tolerance = currentInterval * 0.1
         update()
     }
 
@@ -39,7 +45,10 @@ class DiskMonitor {
 
     private func update() {
         temperature = SMCHelper.diskTemperature()
-        updateUsage()
+        if Date().timeIntervalSince(lastUsageRefresh) >= Self.usageRefreshInterval {
+            lastUsageRefresh = Date()
+            updateUsage()
+        }
         updateIOStats()
     }
 
@@ -70,10 +79,9 @@ class DiskMonitor {
         if IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) == kIOReturnSuccess {
             var service = IOIteratorNext(iter)
             while service != 0 {
-                var props: Unmanaged<CFMutableDictionary>?
-                if IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == kIOReturnSuccess,
-                   let dict = props?.takeRetainedValue() as? [String: Any],
-                   let stats = dict["Statistics"] as? [String: Any] {
+                // Just the one property — copying the driver's whole dictionary cost twice as much.
+                if let stats = IORegistryEntryCreateCFProperty(service, "Statistics" as CFString, kCFAllocatorDefault, 0)?
+                    .takeRetainedValue() as? [String: Any] {
                     if let bytesRead = stats["Bytes (Read)"] as? NSNumber {
                         read += bytesRead.int64Value
                     }

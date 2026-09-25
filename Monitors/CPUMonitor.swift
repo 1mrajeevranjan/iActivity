@@ -180,11 +180,12 @@ class CPUMonitor {
     func start(interval: TimeInterval? = nil) {
         stop()
         if let interval { currentInterval = interval }
+        // Scheduled on the main run loop, so the callback is already on the main actor. The
+        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
         timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.update()
-            }
+            MainActor.assumeIsolated { self?.update() }
         }
+        timer?.tolerance = currentInterval * 0.1
         update()
     }
     
@@ -200,8 +201,19 @@ class CPUMonitor {
         // first post-resume reading averages over the paused interval, same as they do.
     }
     
+    /// Ticks elapsed between two samples of one CPU-state counter. The kernel keeps these as
+    /// unsigned 32-bit values that wrap (an idle core gets there in ~250 days at 100 Hz), but
+    /// they arrive typed as signed `integer_t` — plain `-` trapped on the wrap and crashed the app.
+    nonisolated static func tickDelta(_ current: integer_t, _ previous: integer_t) -> Double {
+        Double(UInt32(bitPattern: current) &- UInt32(bitPattern: previous))
+    }
+
+    /// `mach_host_self()` hands out a new send-right reference on every call; asking once keeps
+    /// a 1 Hz timer from piling up references for the life of the app.
+    private static let host = mach_host_self()
+
     private func update() {
-        let host = mach_host_self()
+        let host = Self.host
         var processorCount: UInt32 = 0
         var processorInfo: processor_info_array_t?
         var infoCount: mach_msg_type_number_t = 0
@@ -220,10 +232,13 @@ class CPUMonitor {
                 let base = i * Int(CPU_STATE_MAX)
                 let prevBase = i * Int(CPU_STATE_MAX)
                 
-                let user = Double(processorInfo[base + Int(CPU_STATE_USER)] - previousInfo[prevBase + Int(CPU_STATE_USER)])
-                let system = Double(processorInfo[base + Int(CPU_STATE_SYSTEM)] - previousInfo[prevBase + Int(CPU_STATE_SYSTEM)])
-                let idle = Double(processorInfo[base + Int(CPU_STATE_IDLE)] - previousInfo[prevBase + Int(CPU_STATE_IDLE)])
-                let nice = Double(processorInfo[base + Int(CPU_STATE_NICE)] - previousInfo[prevBase + Int(CPU_STATE_NICE)])
+                func delta(_ state: Int32) -> Double {
+                    Self.tickDelta(processorInfo[base + Int(state)], previousInfo[prevBase + Int(state)])
+                }
+                let user = delta(CPU_STATE_USER)
+                let system = delta(CPU_STATE_SYSTEM)
+                let idle = delta(CPU_STATE_IDLE)
+                let nice = delta(CPU_STATE_NICE)
                 
                 let total = user + system + idle + nice
                 let usage = total > 0 ? (user + system + nice) / total : 0
@@ -246,11 +261,13 @@ class CPUMonitor {
             self.efficiencyHistory.removeFirst()
             self.efficiencyHistory.append(clusters.efficiency)
             
-            // Cleanup previous info
+        }
+
+        // Freed whether or not it was diffed — a core-count change used to skip this and leak it.
+        if let previousInfo {
             let prevSize = MemoryLayout<integer_t>.stride * Int(previousCount)
             vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: previousInfo)), vm_size_t(prevSize))
         }
-        
         self.previousInfo = processorInfo
         self.previousCount = infoCount
     }

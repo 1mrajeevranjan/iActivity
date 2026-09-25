@@ -25,11 +25,12 @@ class NetworkMonitor {
     func start(interval: TimeInterval? = nil) {
         stop()
         if let interval { currentInterval = interval }
+        // Scheduled on the main run loop, so the callback is already on the main actor. The
+        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
         timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.update()
-            }
+            MainActor.assumeIsolated { self?.update() }
         }
+        timer?.tolerance = currentInterval * 0.1
         update()
     }
     
@@ -97,8 +98,12 @@ class NetworkMonitor {
         self.lastTime = now
     }
 
+    /// One session with configd for the app's lifetime — opening a new one every tick was an
+    /// extra IPC connection setup per second.
+    private static let store = SCDynamicStoreCreate(nil, "iActivity" as CFString, nil, nil)
+
     private static func primaryInterfaceFromSystemConfiguration() -> String? {
-        guard let store = SCDynamicStoreCreate(nil, "iActivity" as CFString, nil, nil),
+        guard let store,
               let value = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any],
               let interface = value["PrimaryInterface"] as? String else {
             return nil

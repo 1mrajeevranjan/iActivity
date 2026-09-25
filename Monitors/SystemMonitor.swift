@@ -27,6 +27,7 @@ class SystemMonitor {
     /// since any tab (and its process list) can be switched to at any time.
     func resumeAll() {
         isPanelVisible = true
+        SMCHelper.isDashboardVisible = true
         if let custom = UserDefaults.standard.object(forKey: "updateInterval") as? Double, custom > 0 {
             applyInterval(custom)
         } else {
@@ -46,6 +47,7 @@ class SystemMonitor {
     /// keeps whatever cadence they already had.
     func pauseBackground(interval: TimeInterval? = nil) {
         isPanelVisible = false
+        SMCHelper.isDashboardVisible = false
         // The menu bar may now show several categories at once, so this keeps the whole set
         // alive rather than a single one. Idle cost scales with that set — the price of the
         // feature, and the reason Settings says so next to the picker.

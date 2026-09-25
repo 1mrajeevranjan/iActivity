@@ -45,6 +45,8 @@ class MemoryMonitor {
 
     private var timer: Timer?
     private var currentInterval: TimeInterval = 2.0
+    /// Asked once: every `mach_host_self()` call adds a send-right reference that is never freed.
+    private static let host = mach_host_self()
 
     init() {
         var memSize: Int64 = 0
@@ -56,11 +58,12 @@ class MemoryMonitor {
     func start(interval: TimeInterval? = nil) {
         stop()
         if let interval { currentInterval = interval }
+        // Scheduled on the main run loop, so the callback is already on the main actor. The
+        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
         timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.update()
-            }
+            MainActor.assumeIsolated { self?.update() }
         }
+        timer?.tolerance = currentInterval * 0.1
         update()
     }
 
@@ -75,7 +78,7 @@ class MemoryMonitor {
 
         var stats = vm_statistics64()
         var size = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
-        let hostPort = mach_host_self()
+        let hostPort = Self.host
 
         let result = withUnsafeMutablePointer(to: &stats) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(size)) {
