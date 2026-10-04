@@ -9,6 +9,9 @@ import SwiftUI
 /// `ChartStyle` having to be written a second time in Core Graphics.
 struct MenuBarLabel: View {
     let monitor: SystemMonitor
+    /// Fires whenever the strip's natural width changes, so the status item can be resized
+    /// in the same frame instead of clipping or padding until a later sync.
+    var onWidthChange: () -> Void = {}
 
     @AppStorage(MenuBarSelection.storageKey) private var storedSelection = MenuBarSelection([])
     @AppStorage("selectedCategory") private var dashboardCategory: MetricCategory = .cpu
@@ -35,6 +38,8 @@ struct MenuBarLabel: View {
             }
         }
         .padding(.horizontal, 4)
+        .fixedSize()
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in onWidthChange() }
         // System design, not rounded, with monospaced digits so the strip does not jitter as
         // values change — matching the AppKit original this replaces.
         .font(.system(size: 12, weight: .medium).monospacedDigit())
@@ -45,16 +50,11 @@ struct MenuBarLabel: View {
             if let temperature = temperatureText(for: category) {
                 // `.primary`, not `.secondary` — the dimmer tone reads as near-invisible against
                 // the menu bar's translucent, wallpaper-varying backdrop.
-                Self.reserving(widest: temperatureUnit.string(fromCelsius: 100, decimals: 0)) {
-                    Text(temperature)
-                        .foregroundStyle(.primary)
-                }
+                Text(temperature)
+                    .foregroundStyle(.primary)
             }
 
-            Self.reserving(widest: widestValueText(for: category)) {
-                Text(valueText(for: category))
-                    .foregroundStyle(status(for: category).color)
-            }
+            valueLabel(for: category)
 
             if showGraph {
                 chart(for: category)
@@ -85,13 +85,17 @@ struct MenuBarLabel: View {
 
     private func percent(_ fraction: Double) -> String { "\(Int(fraction * 100))%" }
 
-    /// The widest this segment's value can get. The status item's width is only reconciled once
-    /// a second, so a value that grew in between ("9%" → "10%") used to be cut off as "1…" until
-    /// the next sync. Sizing every segment for its widest value keeps the strip's width constant.
-    private func widestValueText(for category: MetricCategory) -> String {
-        switch category {
-        case .network: return "↓999.9M ↑999.9M"
-        default: return "100%"
+    /// Percentages hug their digits: reserving "100%" for a "7%" reading left a wide gap
+    /// before it. The status item resizes on `onWidthChange`, so "9%" → "10%" never clips.
+    /// Network alone keeps a fixed slot — its text changes width nearly every tick, and
+    /// letting it reflow would shove every menu bar item to its left back and forth.
+    @ViewBuilder
+    private func valueLabel(for category: MetricCategory) -> some View {
+        let text = Text(valueText(for: category)).foregroundStyle(status(for: category).color)
+        if category == .network {
+            Self.reserving(widest: "↓999.9M ↑999.9M") { text }
+        } else {
+            text
         }
     }
 

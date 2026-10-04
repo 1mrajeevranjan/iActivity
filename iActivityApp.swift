@@ -28,7 +28,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarHosting: ClickThroughHostingView<MenuBarLabel>?
     var monitor = SystemMonitor()
     var panelManager: PanelManager?
-    var updateTimer: Timer?
     var onboardingWindow: NSWindow?
     var settingsWindow: NSWindow?
 
@@ -51,20 +50,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Constraining it to fill the button makes `fittingSize` report the button's width,
             // which is itself whatever `statusItem.length` was last set to — a loop that
             // resolves to nothing and leaves an invisible, unclickable item in the menu bar.
-            let hosting = ClickThroughHostingView(rootView: MenuBarLabel(monitor: monitor))
+            let label = MenuBarLabel(monitor: monitor) { [weak self] in
+                // Deferred: resizing the hosting view mid-SwiftUI-update is not allowed.
+                DispatchQueue.main.async { self?.syncMenuBarWidth() }
+            }
+            let hosting = ClickThroughHostingView(rootView: label)
             hosting.translatesAutoresizingMaskIntoConstraints = true
             hosting.autoresizingMask = []
             button.addSubview(hosting)
             menuBarHosting = hosting
         }
 
-        // SwiftUI redraws the strip's contents by itself; this only reconciles the status
-        // item's width, which is AppKit state nothing updates on its behalf.
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.syncMenuBarWidth()
-            }
-        }
         syncMenuBarWidth()
 
         // Show onboarding on first launch
