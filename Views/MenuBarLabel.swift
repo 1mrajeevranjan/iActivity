@@ -85,17 +85,21 @@ struct MenuBarLabel: View {
 
     private func percent(_ fraction: Double) -> String { "\(Int(fraction * 100))%" }
 
-    /// Percentages hug their digits: reserving "100%" for a "7%" reading left a wide gap
-    /// before it. The status item resizes on `onWidthChange`, so "9%" → "10%" never clips.
-    /// Network alone keeps a fixed slot — its text changes width nearly every tick, and
-    /// letting it reflow would shove every menu bar item to its left back and forth.
+    /// Percentages reserve two digits, not three: hugging the text made every 9% ↔ 10% flip
+    /// shove the whole menu bar sideways, while reserving "100%" left a wide gap before "7%".
+    /// Two digits costs one digit of slack at most; a rare "100%" still grows the slot
+    /// (the status item resizes on `onWidthChange`). Network keeps its full fixed slot —
+    /// its text changes width nearly every tick.
     @ViewBuilder
     private func valueLabel(for category: MetricCategory) -> some View {
         let text = Text(valueText(for: category)).foregroundStyle(status(for: category).color)
         if category == .network {
             Self.reserving(widest: "↓999.9M ↑999.9M") { text }
         } else {
-            text
+            ZStack(alignment: .trailing) {
+                Text("00%").hidden()
+                text
+            }
         }
     }
 
