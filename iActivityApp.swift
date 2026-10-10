@@ -32,8 +32,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Set to background accessory mode (no Dock icon)
-        AppSetup.shared.setDockIconVisibility(false)
+        AppSetup.shared.setDockIconVisibility(UserDefaults.standard.bool(forKey: "showInDock"))
+        let mode = UserDefaults.standard.string(forKey: "appearanceMode").flatMap(AppearanceMode.init(rawValue:)) ?? .auto
+        mode.apply()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         panelManager = PanelManager(monitor: monitor, statusItem: statusItem)

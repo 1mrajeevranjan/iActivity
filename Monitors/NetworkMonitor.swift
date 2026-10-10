@@ -18,19 +18,19 @@ class NetworkMonitor {
     /// switch would report a bogus multi-GB spike, so the first tick after one only re-baselines.
     private var lastInterface = ""
     private var hasBaseline = false
-    private var lastTime: Date = Date()
+    private var lastTime: TimeInterval = ProcessInfo.processInfo.systemUptime
     private var timer: Timer?
     private var currentInterval: TimeInterval = 1.0
 
     func start(interval: TimeInterval? = nil) {
         stop()
         if let interval { currentInterval = interval }
-        // Scheduled on the main run loop, so the callback is already on the main actor. The
-        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
-        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
+        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
+        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.update() }
         }
         timer?.tolerance = currentInterval * 0.1
+        if let timer { RunLoop.main.add(timer, forMode: .common) }
         update()
     }
     
@@ -47,8 +47,7 @@ class NetworkMonitor {
         // mixed in unrelated tunnel/AWDL traffic. The real primary interface is whichever
         // one owns the default route, which SystemConfiguration reports directly.
         guard let primary = Self.primaryInterfaceFromSystemConfiguration() else {
-            self.primaryInterfaceName = "—"
-            self.isConnected = false
+            recordSample(interface: nil, inBytes: 0, outBytes: 0, time: ProcessInfo.processInfo.systemUptime)
             return
         }
 
@@ -72,30 +71,31 @@ class NetworkMonitor {
             ptr = interface.ifa_next
         }
 
-        self.primaryInterfaceName = primary
-        self.isConnected = true
-        
-        let now = Date()
-        let interval = now.timeIntervalSince(lastTime)
-        
-        if hasBaseline && primary == lastInterface && interval > 0 {
-            let inDelta = totalInBytes &- lastInBytes
-            let outDelta = totalOutBytes &- lastOutBytes
-            
-            self.downloadSpeed = Double(inDelta) / interval
-            self.uploadSpeed = Double(outDelta) / interval
-            
-            self.downloadHistory.removeFirst()
-            self.downloadHistory.append(downloadSpeed)
-            self.uploadHistory.removeFirst()
-            self.uploadHistory.append(uploadSpeed)
+        recordSample(interface: primary, inBytes: totalInBytes, outBytes: totalOutBytes,
+                     time: ProcessInfo.processInfo.systemUptime)
+    }
+
+    func recordSample(interface: String?, inBytes: UInt32, outBytes: UInt32, time: TimeInterval) {
+        primaryInterfaceName = interface ?? "—"
+        isConnected = interface != nil
+        let elapsed = time - lastTime
+        if let interface, hasBaseline, interface == lastInterface, elapsed > 0 {
+            downloadSpeed = Double(inBytes &- lastInBytes) / elapsed
+            uploadSpeed = Double(outBytes &- lastOutBytes) / elapsed
+        } else {
+            // Disconnects and interface changes must clear the previous link's rates.
+            downloadSpeed = 0
+            uploadSpeed = 0
         }
-        
-        self.lastInBytes = totalInBytes
-        self.lastOutBytes = totalOutBytes
-        self.lastInterface = primary
-        self.hasBaseline = true
-        self.lastTime = now
+        downloadHistory.removeFirst()
+        downloadHistory.append(downloadSpeed)
+        uploadHistory.removeFirst()
+        uploadHistory.append(uploadSpeed)
+        lastInBytes = inBytes
+        lastOutBytes = outBytes
+        lastInterface = interface ?? ""
+        hasBaseline = interface != nil
+        lastTime = time
     }
 
     /// One session with configd for the app's lifetime — opening a new one every tick was an
@@ -103,11 +103,11 @@ class NetworkMonitor {
     private static let store = SCDynamicStoreCreate(nil, "iActivity" as CFString, nil, nil)
 
     private static func primaryInterfaceFromSystemConfiguration() -> String? {
-        guard let store,
-              let value = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any],
-              let interface = value["PrimaryInterface"] as? String else {
-            return nil
+        guard let store else { return nil }
+        for family in ["IPv4", "IPv6"] {
+            if let value = SCDynamicStoreCopyValue(store, "State:/Network/Global/\(family)" as CFString) as? [String: Any],
+               let interface = value["PrimaryInterface"] as? String { return interface }
         }
-        return interface
+        return nil
     }
 }

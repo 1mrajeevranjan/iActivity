@@ -25,12 +25,12 @@ class BatteryMonitor {
     func start(interval: TimeInterval? = nil) {
         stop()
         if let interval { currentInterval = interval }
-        // Scheduled on the main run loop, so the callback is already on the main actor. The
-        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
-        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
+        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
+        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.update() }
         }
         timer?.tolerance = currentInterval * 0.1
+        if let timer { RunLoop.main.add(timer, forMode: .common) }
         update()
     }
 

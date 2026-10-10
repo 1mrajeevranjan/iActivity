@@ -58,7 +58,7 @@ struct BatteryView: View {
             CardDivider()
 
             VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Apps using significant energy")
+                GroupLabel(text: "Top processes by CPU")
                 TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
             }
         }

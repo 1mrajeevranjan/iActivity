@@ -196,6 +196,16 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
         case .auto: return nil
         }
     }
+
+    @MainActor
+    func apply() {
+        // AppKit owns these windows. Clearing its override restores live system appearance.
+        switch self {
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        case .auto: NSApp.appearance = nil
+        }
+    }
 }
 
 enum TemperatureUnit: String, CaseIterable, Identifiable {

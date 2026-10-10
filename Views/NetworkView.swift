@@ -54,7 +54,7 @@ struct NetworkView: View {
             CardDivider()
 
             VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Most active processes")
+                GroupLabel(text: "Top processes by CPU")
                 TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
             }
         }

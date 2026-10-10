@@ -20,7 +20,7 @@ class SystemMonitor {
         // Only the categories the menu bar displays need to be live before the dashboard is
         // ever opened — the remaining monitors and the process scanner (a full system-wide
         // process walk) have nothing to feed until then.
-        pauseBackground()
+        pauseBackground(interval: currentInterval)
     }
 
     /// Every monitor at the user's configured cadence — used while the dashboard panel is open,
@@ -28,17 +28,12 @@ class SystemMonitor {
     func resumeAll() {
         isPanelVisible = true
         SMCHelper.isDashboardVisible = true
-        if let custom = UserDefaults.standard.object(forKey: "updateInterval") as? Double, custom > 0 {
-            applyInterval(custom)
-        } else {
-            cpu.start()
-            gpu.start()
-            memory.start()
-            disk.start()
-            battery.start()
-            network.start()
-        }
-        processes.start()
+        applyInterval(currentInterval)
+    }
+
+    private var currentInterval: TimeInterval {
+        let stored = UserDefaults.standard.object(forKey: "updateInterval") as? Double
+        return stored.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? RefreshInterval.normal.rawValue
     }
 
     /// Stops every monitor the menu bar is not showing, plus the process scanner — used while
@@ -66,6 +61,7 @@ class SystemMonitor {
     /// touches the menu bar's active monitors — applying it to all six would silently undo
     /// `pauseBackground()` the next time Settings' "Update Every" picker changes.
     func applyInterval(_ interval: TimeInterval) {
+        guard interval.isFinite, interval > 0 else { return }
         guard isPanelVisible else {
             pauseBackground(interval: interval)
             return
@@ -76,13 +72,14 @@ class SystemMonitor {
         disk.start(interval: interval)
         battery.start(interval: interval)
         network.start(interval: interval)
+        processes.start(interval: interval)
     }
 
     /// Re-applies the pause policy after the menu bar's category set changes. Without this a
     /// newly ticked category shows a frozen reading until the dashboard is next opened.
     func menuBarSelectionChanged() {
         guard !isPanelVisible else { return }
-        pauseBackground()
+        pauseBackground(interval: currentInterval)
     }
 
     func stop() {

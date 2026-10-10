@@ -41,7 +41,6 @@ struct MainDashboardView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     @AppStorage("selectedCategory") private var selectedCategory: MetricCategory = .cpu
-    @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .auto
     /// Direction of the last tab change, so content slides the way the pill travels.
     @State private var isForward = true
     @State private var cardHeight: CGFloat = 0
@@ -83,7 +82,7 @@ struct MainDashboardView: View {
                     header
                     categoryTabs
                         .padding(.horizontal, gutter)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, gutter)
                 }
                 .measureHeight(ChromeHeightKey.self)
 
@@ -96,19 +95,23 @@ struct MainDashboardView: View {
                 // proposes, so the measurement is no longer a function of its own output.
                 ScrollView {
                     content(for: selectedCategory)
-                        .cardSurface()
-                        .padding(.horizontal, gutter)
-                        .padding(.bottom, gutter)
+                        .padding(AppTheme.Metrics.cardPadding)
                         .fixedSize(horizontal: false, vertical: true)
                         .measureHeight(CardHeightKey.self)
                 }
                 .scrollIndicators(.never)
+                .cardSurface(padding: 0)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Metrics.cardRadius, style: .continuous))
+                .padding(.horizontal, gutter)
                 .id(selectedCategory)
                 .transition(contentTransition)
 
                 footer
+                    // Keep this gap outside scrolling content, including at the screen limit.
+                    .padding(.top, gutter)
                     .padding(.horizontal, gutter)
                     .padding(.bottom, gutter)
+                    .fixedSize(horizontal: false, vertical: true)
                     .measureHeight(ChromeHeightKey.self)
             }
             // Sits below the beak, clipped to the same silhouette as the fill.
@@ -125,7 +128,6 @@ struct MainDashboardView: View {
         .padding(.horizontal, AppTheme.Panel.shadowMargin)
         .padding(.bottom, AppTheme.Panel.shadowMargin)
         .padding(.top, AppTheme.Panel.topGutter)
-        .preferredColorScheme(appearanceMode.colorScheme)
         .onReceive(NotificationCenter.default.publisher(for: .selectMetricCategory)) { note in
             guard let raw = note.object as? String, let category = MetricCategory(rawValue: raw) else { return }
             select(category)
