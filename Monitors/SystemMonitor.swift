@@ -15,6 +15,9 @@ class SystemMonitor {
     /// Tracks pause/resume state so `applyInterval` — triggered from Settings independently of
     /// the panel — knows whether to touch all six monitors or just the menu bar's active set.
     private var isPanelVisible = false
+    private var activeCategories: Set<MetricCategory> = []
+    private var timer: Timer?
+    private var samplingInterval: TimeInterval = RefreshInterval.normal.rawValue
 
     init() {
         // Only the categories the menu bar displays need to be live before the dashboard is
@@ -43,18 +46,9 @@ class SystemMonitor {
     func pauseBackground(interval: TimeInterval? = nil) {
         isPanelVisible = false
         SMCHelper.isDashboardVisible = false
-        // The menu bar may now show several categories at once, so this keeps the whole set
-        // alive rather than a single one. Idle cost scales with that set — the price of the
-        // feature, and the reason Settings says so next to the picker.
-        let active = Set(MenuBarSelection.current.categories)
-
-        if active.contains(.cpu) { cpu.start(interval: interval) } else { cpu.stop() }
-        if active.contains(.gpu) { gpu.start(interval: interval) } else { gpu.stop() }
-        if active.contains(.memory) { memory.start(interval: interval) } else { memory.stop() }
-        if active.contains(.disk) { disk.start(interval: interval) } else { disk.stop() }
-        if active.contains(.battery) { battery.start(interval: interval) } else { battery.stop() }
-        if active.contains(.network) { network.start(interval: interval) } else { network.stop() }
         processes.stop()
+        activeCategories = Set(MenuBarSelection.current.categories)
+        schedule(interval: interval)
     }
 
     /// Overrides the refresh cadence (used by Settings). While the panel is hidden this only
@@ -66,13 +60,9 @@ class SystemMonitor {
             pauseBackground(interval: interval)
             return
         }
-        cpu.start(interval: interval)
-        gpu.start(interval: interval)
-        memory.start(interval: interval)
-        disk.start(interval: interval)
-        battery.start(interval: interval)
-        network.start(interval: interval)
-        processes.start(interval: interval)
+        processes.stop()
+        activeCategories = Set(MetricCategory.allCases)
+        schedule(interval: interval)
     }
 
     /// Re-applies the pause policy after the menu bar's category set changes. Without this a
@@ -83,13 +73,40 @@ class SystemMonitor {
     }
 
     func stop() {
-        cpu.stop()
-        gpu.stop()
-        memory.stop()
-        disk.stop()
-        battery.stop()
-        network.stop()
+        timer?.invalidate()
+        timer = nil
         processes.stop()
+        activeCategories = []
+        isPanelVisible = false
+        SMCHelper.isDashboardVisible = false
+    }
+
+    isolated deinit {
+        timer?.invalidate()
+    }
+
+    private func schedule(interval: TimeInterval?) {
+        if let interval, interval.isFinite, interval > 0 { samplingInterval = interval }
+        timer?.invalidate()
+        // ponytail: one clock batches every live reading and its UI update. Seven independent
+        // timers staggered kernel calls and redraws; all categories still keep the chosen cadence.
+        let timer = Timer(timeInterval: samplingInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.update() }
+        }
+        timer.tolerance = samplingInterval * 0.1
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        update()
+    }
+
+    private func update() {
+        if activeCategories.contains(.cpu) { cpu.update() }
+        if activeCategories.contains(.gpu) { gpu.update() }
+        if activeCategories.contains(.memory) { memory.update() }
+        if activeCategories.contains(.disk) { disk.update() }
+        if activeCategories.contains(.battery) { battery.update() }
+        if activeCategories.contains(.network) { network.update() }
+        if isPanelVisible { processes.update() }
     }
 }
 

@@ -15,30 +15,10 @@ class DiskMonitor {
     var readHistory: [Double] = Array(repeating: 0, count: 60)
     var writeHistory: [Double] = Array(repeating: 0, count: 60)
 
-    private var timer: Timer?
     private var lastReadBytes: Int64 = 0
     private var lastWriteBytes: Int64 = 0
     private var lastUpdate: Date = Date()
-    private var currentInterval: TimeInterval = 1.0
-
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
-        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
-        update()
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func update() {
+    func update() {
         temperature = SMCHelper.diskTemperature()
         updateUsage()
         updateIOStats()

@@ -19,27 +19,7 @@ class BatteryMonitor {
     var healthPercentage: Double = 0
     var cycleCount: Int = 0
 
-    private var timer: Timer?
-    private var currentInterval: TimeInterval = 5.0
-
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
-        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
-        update()
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func update() {
+    func update() {
         temperature = SMCHelper.batteryTemperature()
 
         let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()

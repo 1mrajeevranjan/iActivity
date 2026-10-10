@@ -68,6 +68,7 @@ struct DashboardRegressionTests {
                     anchor.maxCardHeight = ceiling
                     let hosting = NSHostingView(rootView: MainDashboardView().environment(monitor).environment(anchor)
                         .transaction { $0.disablesAnimations = true }.defaultAppStorage(defaults))
+                    hosting.sizingOptions = []
                     let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: AppTheme.Panel.windowWidth, height: ceiling + 22),
                                           styleMask: [.borderless], backing: .buffered, defer: false)
                     window.isReleasedWhenClosed = false
@@ -121,6 +122,27 @@ struct DashboardRegressionTests {
         #expect(network.downloadSpeed == 0 && network.uploadSpeed == 0)
         network.recordSample(interface: "en1", inBytes: 9, outBytes: 19, time: 8)
         #expect(network.downloadSpeed == 10 && network.uploadSpeed == 20)
+    }
+
+    @Test("Process count changes do not resize dashboard cards")
+    func processListHeightIsStable() {
+        func entry(_ id: Int) -> ProcessMonitor.ProcessEntry {
+            ProcessMonitor.ProcessEntry(pid: Int32(id), name: "process-\(id)",
+                                        cpuPercent: Double(id), memoryMB: Double(id * 10),
+                                        diskBytesPerSecond: Double(id * 1_000))
+        }
+        func height(_ processes: [ProcessMonitor.ProcessEntry], metric: TopProcessesView.Metric) -> CGFloat {
+            let hosting = NSHostingView(rootView: TopProcessesView(processes: processes, metric: metric, tint: .orange)
+                .frame(width: 280))
+            hosting.layoutSubtreeIfNeeded()
+            return hosting.fittingSize.height
+        }
+
+        for metric in [TopProcessesView.Metric.cpu, .memory, .disk] {
+            let empty = height([], metric: metric)
+            #expect(empty == height([entry(1)], metric: metric))
+            #expect(empty == height((1...5).map(entry), metric: metric))
+        }
     }
 
     @Test("Live dashboard values agree with native hardware APIs and update their histories")
@@ -245,5 +267,34 @@ struct DashboardRegressionTests {
         #expect(monitor.disk.readHistory.last != -1)
         #expect(monitor.battery.levelHistory.last != -1)
         #expect(monitor.network.downloadHistory.last != -1)
+    }
+
+    @Test("The shared sampling clock pauses unseen categories and stops completely")
+    func samplingLifecycle() {
+        let monitor = SystemMonitor()
+        defer { monitor.stop() }
+        let active = Set(MenuBarSelection.current.categories)
+        func values() -> [MetricCategory: Double] {
+            [.cpu: monitor.cpu.history.last!, .gpu: monitor.gpu.history.last!,
+             .memory: monitor.memory.usageHistory.last!, .disk: monitor.disk.readHistory.last!,
+             .battery: monitor.battery.levelHistory.last!, .network: monitor.network.downloadHistory.last!]
+        }
+        monitor.pauseBackground(interval: 0.1)
+        monitor.cpu.history[59] = -1
+        monitor.gpu.history[59] = -1
+        monitor.memory.usageHistory[59] = -1
+        monitor.disk.readHistory[59] = -1
+        monitor.battery.levelHistory[59] = -1
+        monitor.network.downloadHistory[59] = -1
+        pump(0.3)
+        for (category, value) in values() { #expect((value != -1) == active.contains(category)) }
+        monitor.resumeAll()
+        monitor.applyInterval(0.1)
+        pump(0.3)
+        #expect(values().values.allSatisfy { $0 >= 0 })
+        monitor.stop()
+        let stopped = values()
+        pump(0.3)
+        #expect(values() == stopped)
     }
 }

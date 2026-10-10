@@ -13,12 +13,8 @@ class GPUMonitor {
     var temperature: Double = 0
     var rendererName: String = "Apple GPU"
 
-    private var timer: Timer?
-    private var currentInterval: TimeInterval = 2.0
-
     /// Looked up once: searching the registry for the accelerator and copying its full property
     /// dictionary every tick cost ~70× more than reading one key off a held service.
-    /// ponytail: held for the app's lifetime, never released — there is only ever one.
     private let service: io_service_t
 
     init() {
@@ -51,24 +47,11 @@ class GPUMonitor {
         IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
     }
 
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
-        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
-        update()
+    deinit {
+        if service != 0 { IOObjectRelease(service) }
     }
 
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func update() {
+    func update() {
         // Update GPU temperature
         temperature = SMCHelper.gpuTemperature()
 

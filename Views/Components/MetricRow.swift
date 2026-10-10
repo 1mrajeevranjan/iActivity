@@ -22,8 +22,6 @@ struct MetricRow: View {
     var secondaryHistory: [Double]? = nil
     var secondaryTint: Color = AppTheme.Colors.brandBlue
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
@@ -41,7 +39,7 @@ struct MetricRow: View {
                     .layoutPriority(1)
 
                 if let fraction {
-                    ProgressBar(fraction: fraction, tint: tint, animated: !reduceMotion)
+                    ProgressBar(fraction: fraction, tint: tint)
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 4)
                 } else {
@@ -72,11 +70,10 @@ struct MetricRow: View {
     }
 }
 
-/// Thin capsule bar. Its own view so the row stays readable and the fill animation lives in one place.
+/// Live readings update once per sample; animating their width re-laid out the dashboard at 60 Hz.
 struct ProgressBar: View {
     let fraction: Double
     let tint: Color
-    var animated: Bool = true
 
     var body: some View {
         GeometryReader { geo in
@@ -87,7 +84,6 @@ struct ProgressBar: View {
                 Capsule(style: .continuous)
                     .fill(tint)
                     .frame(width: geo.size.width * CGFloat(min(max(fraction, 0), 1)))
-                    .animation(animated ? .easeOut(duration: 0.3) : nil, value: fraction)
             }
         }
         .frame(height: AppTheme.Metrics.barHeight)

@@ -7,8 +7,6 @@ struct TopProcessesView: View {
     let metric: Metric
     let tint: Color
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     enum Metric {
         case cpu
         case memory
@@ -32,26 +30,24 @@ struct TopProcessesView: View {
     var body: some View {
         VStack(spacing: 2) {
             if rows.isEmpty && metric == .disk {
-                // Unlike CPU, an idle disk genuinely has nothing to rank.
                 Text("No disk activity")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 56)
             } else if rows.isEmpty {
-                HStack {
-                    Spacer()
-                    ProgressView().controlSize(.small)
-                    Spacer()
-                }
-                .frame(height: 56)
-                .accessibilityLabel(Text("Loading processes"))
+                Text("No active processes")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
             } else {
                 ForEach(rows) { process in
                     row(process)
                 }
             }
         }
+        // ponytail: five rows is the existing display limit; reserving them stops live process
+        // counts from resizing and vertically bouncing the entire menu-bar panel.
+        .frame(height: 133, alignment: rows.isEmpty ? .center : .top)
     }
 
     private func row(_ process: ProcessMonitor.ProcessEntry) -> some View {
@@ -81,7 +77,6 @@ struct TopProcessesView: View {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(tint.opacity(0.13))
                     .frame(width: geo.size.width * CGFloat(min(max(fraction, 0), 1)))
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: fraction)
             }
         }
         .accessibilityElement(children: .ignore)

@@ -30,8 +30,6 @@ class ProcessMonitor {
     private(set) var topByCPU: [ProcessEntry] = []
     private(set) var topByDisk: [ProcessEntry] = []
     private(set) var topByMemory: [ProcessEntry] = []
-    private var timer: Timer?
-    private var currentInterval: TimeInterval = 2
     private var isFetching = false
     private var fetchGeneration = 0
     
@@ -51,27 +49,13 @@ class ProcessMonitor {
     
     // MARK: - Lifecycle
     
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Fetch immediately on start
-        doFetch()
-        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.doFetch() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
-    }
-    
     func stop() {
-        timer?.invalidate()
-        timer = nil
         fetchGeneration += 1
     }
     
     // MARK: - Fetch (called on any thread, posts to main)
     
-    private func doFetch() {
+    func update() {
         guard !isFetching else { return }
         isFetching = true
         let generation = fetchGeneration

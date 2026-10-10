@@ -43,8 +43,6 @@ class MemoryMonitor {
         return Double(usage.xsu_used)
     }
 
-    private var timer: Timer?
-    private var currentInterval: TimeInterval = 2.0
     /// Asked once: every `mach_host_self()` call adds a send-right reference that is never freed.
     private static let host = mach_host_self()
 
@@ -55,24 +53,7 @@ class MemoryMonitor {
         self.total = Double(memSize)
     }
 
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
-        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
-        update()
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func update() {
+    func update() {
         // Update memory / SoC temperature
         temperature = SMCHelper.memoryTemperature()
 

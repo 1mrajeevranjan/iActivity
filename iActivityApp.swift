@@ -56,6 +56,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async { self?.syncMenuBarWidth() }
             }
             let hosting = ClickThroughHostingView(rootView: label)
+            // Only the strip's ideal width matters; the status item never uses min/max sizes.
+            hosting.sizingOptions = [.intrinsicContentSize]
             hosting.translatesAutoresizingMaskIntoConstraints = true
             hosting.autoresizingMask = []
             button.addSubview(hosting)

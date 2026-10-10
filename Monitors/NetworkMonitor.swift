@@ -19,27 +19,8 @@ class NetworkMonitor {
     private var lastInterface = ""
     private var hasBaseline = false
     private var lastTime: TimeInterval = ProcessInfo.processInfo.systemUptime
-    private var timer: Timer?
-    private var currentInterval: TimeInterval = 1.0
-
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Common modes keep sampling during scrolling and menu tracking; tolerance coalesces wakeups.
-        timer = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
-        update()
-    }
     
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
-    private func update() {
+    func update() {
         // getifaddrs enumerates every UP interface — including idle virtual adapters
         // (anpi0/anpi1, bridge0, ap1) that macOS lists ahead of the real Wi-Fi/Ethernet
         // device. Taking "the first UP, non-loopback interface" as primary picked one of

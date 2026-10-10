@@ -149,8 +149,6 @@ struct CoreBar: View {
     let usage: Double
     let tint: Color
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack(spacing: 8) {
             Text(kind.label)
@@ -159,7 +157,7 @@ struct CoreBar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 58, alignment: .leading)
 
-            ProgressBar(fraction: usage, tint: tint, animated: !reduceMotion)
+            ProgressBar(fraction: usage, tint: tint)
 
             Text("\(Int(usage * 100))%")
                 .font(.caption)

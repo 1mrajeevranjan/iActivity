@@ -15,6 +15,7 @@ enum SMCHelper {
     private static var didOpen = false
     /// Every temperature key on this machine, with the byte size and type each read needs.
     private static var temperatureKeys: [(key: UInt32, name: String, info: KeyInfo)]?
+    private static let keysByPrefix = Dictionary(grouping: allTemperatureKeys()) { String($0.name.prefix(2)) }
 
     /// Set by `SystemMonitor`. With the dashboard closed, the menu bar's temperature toggle is
     /// the only thing on screen that shows a reading. Each reading is one SMC round-trip per
@@ -35,19 +36,23 @@ enum SMCHelper {
 
     private static func average(prefixes: [String], fallback: [String] = []) -> Double {
         guard isReadingNeeded else { return 0 }
-        let primary = readings(prefixes: prefixes)
-        let values = primary.isEmpty ? readings(prefixes: fallback) : primary
-        guard !values.isEmpty else { return 0 }
-        return values.reduce(0, +) / Double(values.count)
+        return mean(prefixes: prefixes) ?? mean(prefixes: fallback) ?? 0
     }
 
-    private static func readings(prefixes: [String]) -> [Double] {
-        guard !prefixes.isEmpty else { return [] }
-        return allTemperatureKeys()
-            .filter { entry in prefixes.contains { entry.name.hasPrefix($0) } }
-            .compactMap { read($0.key, info: $0.info) }
-            // Unpopulated sensor slots report 0 or a small constant; nothing real sits outside this.
-            .filter { $0 > 10 && $0 < 130 }
+    private static func mean(prefixes: [String]) -> Double? {
+        var sum = 0.0
+        var count = 0
+        // Sensor membership never changes: avoid scanning every key and allocating intermediate
+        // arrays for every category on every tick. The sensor values themselves are always fresh.
+        for prefix in prefixes {
+            for entry in keysByPrefix[prefix] ?? [] {
+                // Unpopulated sensor slots report 0 or a small constant.
+                guard let value = read(entry.key, info: entry.info), value > 10, value < 130 else { continue }
+                sum += value
+                count += 1
+            }
+        }
+        return count > 0 ? sum / Double(count) : nil
     }
 
     // MARK: - SMC protocol
@@ -154,15 +159,21 @@ enum SMCHelper {
     }
 
     private static func read(_ key: UInt32, info: KeyInfo) -> Double? {
-        guard let bytes = rawBytes(key, info: info) else { return nil }
-        if info.type == floatType, bytes.count >= 4 {
-            return Double(bytes.withUnsafeBytes { $0.loadUnaligned(as: Float.self) })
+        var input = KeyData()
+        input.key = key
+        input.dataSize = info.size
+        input.command = readBytesCommand
+        guard let output = call(input) else { return nil }
+        return withUnsafeBytes(of: output.bytes) { bytes in
+            if info.type == floatType, info.size >= 4 {
+                return Double(bytes.loadUnaligned(as: Float.self))
+            }
+            if info.type == sp78Type, info.size >= 2 {
+                // Signed fixed point, 8 fractional bits, big-endian.
+                return Double(Int16(bitPattern: UInt16(bytes[0]) << 8 | UInt16(bytes[1]))) / 256
+            }
+            return nil
         }
-        if info.type == sp78Type, bytes.count >= 2 {
-            // Signed fixed point, 8 fractional bits, big-endian.
-            return Double(Int16(bitPattern: UInt16(bytes[0]) << 8 | UInt16(bytes[1]))) / 256
-        }
-        return nil
     }
 
     private static func fourCC(_ string: String) -> UInt32 {

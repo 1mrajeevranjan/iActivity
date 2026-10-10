@@ -14,6 +14,7 @@ APP_BUNDLE="$PWD/iActivity.app"
 pkill -x iActivity >/dev/null 2>&1 || true
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 cp "$APP_BINARY" "$APP_BUNDLE/Contents/MacOS/iActivity"
+if [[ "$MODE" != --debug ]]; then strip -rSTx "$APP_BUNDLE/Contents/MacOS/iActivity"; fi
 codesign --force --sign - "$APP_BUNDLE"
 
 if [[ "$MODE" == --debug ]]; then
