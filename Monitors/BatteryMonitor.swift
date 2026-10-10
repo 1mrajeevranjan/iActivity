@@ -19,27 +19,7 @@ class BatteryMonitor {
     var healthPercentage: Double = 0
     var cycleCount: Int = 0
 
-    private var timer: Timer?
-    private var currentInterval: TimeInterval = 5.0
-
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Scheduled on the main run loop, so the callback is already on the main actor. The
-        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
-        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        update()
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func update() {
+    func update() {
         temperature = SMCHelper.batteryTemperature()
 
         let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()

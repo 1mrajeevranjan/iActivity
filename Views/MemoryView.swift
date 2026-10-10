@@ -90,8 +90,6 @@ struct CompositionRow: View {
     let fraction: Double
     let tint: Color
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
@@ -99,7 +97,7 @@ struct CompositionRow: View {
                 .foregroundStyle(.primary)
                 .frame(width: 80, alignment: .leading)
 
-            ProgressBar(fraction: fraction, tint: tint, animated: !reduceMotion)
+            ProgressBar(fraction: fraction, tint: tint)
 
             Text(value)
                 .font(.callout.weight(.medium))

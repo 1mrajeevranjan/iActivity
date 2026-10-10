@@ -30,7 +30,8 @@ class ProcessMonitor {
     private(set) var topByCPU: [ProcessEntry] = []
     private(set) var topByDisk: [ProcessEntry] = []
     private(set) var topByMemory: [ProcessEntry] = []
-    private var timer: Timer?
+    private var isFetching = false
+    private var fetchGeneration = 0
     
     // MARK: - Previous CPU snapshot for delta calculation
     private var prevSnapshot: [Int32: Sample] = [:]
@@ -48,31 +49,24 @@ class ProcessMonitor {
     
     // MARK: - Lifecycle
     
-    func start() {
-        stop()
-        // Fetch immediately on start
-        doFetch()
-        // Then every 5 seconds
-        timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.doFetch() }
-        }
-        timer?.tolerance = 0.5
-    }
-    
     func stop() {
-        timer?.invalidate()
-        timer = nil
+        fetchGeneration += 1
     }
     
     // MARK: - Fetch (called on any thread, posts to main)
     
-    private func doFetch() {
+    func update() {
+        guard !isFetching else { return }
+        isFetching = true
+        let generation = fetchGeneration
         let snapshot = self.prevSnapshot
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             let (entries, newSnapshot) = Self.fetchAll(prevSnapshot: snapshot)
             let rankings = Self.rank(entries)
             DispatchQueue.main.async {
+                self.isFetching = false
+                guard self.fetchGeneration == generation else { return }
                 self.prevSnapshot = newSnapshot
                 self.topByCPU = rankings.cpu
                 self.topByDisk = rankings.disk

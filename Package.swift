@@ -13,7 +13,8 @@ let package = Package(
         .executableTarget(
             name: "iActivity",
             path: ".",
-            exclude: ["Tests", "docs", "videos"],
+            exclude: ["Tests", "docs", "videos", "brag-output", "script", "iActivity.app",
+                      "iActivity.dmg", "Info.plist", "README.md", "build_and_package.sh", "icon.png"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

@@ -166,7 +166,11 @@ class PanelManager: ObservableObject {
     }
 
     private func makeContentView() -> NSView {
-        NSHostingView(rootView: MainDashboardView().environment(monitor).environment(anchor))
+        let hosting = NSHostingView(rootView: MainDashboardView().environment(monitor).environment(anchor))
+        // The card reports its height through PanelAnchor. AppKit's additional min/max/ideal
+        // size probes re-layout the entire dashboard on every animation frame for no benefit.
+        hosting.sizingOptions = []
+        return hosting
     }
 
     /// Grows or shrinks the panel to the current tab's actual content height, keeping the top

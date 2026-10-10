@@ -5,7 +5,7 @@ struct SettingsView: View {
 
     @State private var launchAtLogin = AppSetup.shared.isLaunchAtLoginEnabled
     @AppStorage("showInDock") private var showInDock: Bool = false
-    @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .dark
+    @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .auto
     @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
     @AppStorage("selectedCategory") private var dashboardCategory: MetricCategory = .cpu
     @AppStorage(MenuBarSelection.storageKey) private var storedSelection = MenuBarSelection([])
@@ -73,6 +73,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .onChange(of: appearanceMode) { _, mode in mode.apply() }
 
                 Picker("Temperature Unit", selection: $temperatureUnit) {
                     ForEach(TemperatureUnit.allCases) { unit in
@@ -160,7 +161,6 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 420, height: 540)
-        .preferredColorScheme(appearanceMode.colorScheme)
         // Esc-to-close is handled by a local NSEvent monitor in AppDelegate.showSettings() —
         // `.onExitCommand` never fired here, apparently swallowed by Form before it could see Esc.
     }

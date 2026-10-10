@@ -32,8 +32,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Set to background accessory mode (no Dock icon)
-        AppSetup.shared.setDockIconVisibility(false)
+        AppSetup.shared.setDockIconVisibility(UserDefaults.standard.bool(forKey: "showInDock"))
+        let mode = UserDefaults.standard.string(forKey: "appearanceMode").flatMap(AppearanceMode.init(rawValue:)) ?? .auto
+        mode.apply()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         panelManager = PanelManager(monitor: monitor, statusItem: statusItem)
@@ -55,6 +56,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async { self?.syncMenuBarWidth() }
             }
             let hosting = ClickThroughHostingView(rootView: label)
+            // Only the strip's ideal width matters; the status item never uses min/max sizes.
+            hosting.sizingOptions = [.intrinsicContentSize]
             hosting.translatesAutoresizingMaskIntoConstraints = true
             hosting.autoresizingMask = []
             button.addSubview(hosting)

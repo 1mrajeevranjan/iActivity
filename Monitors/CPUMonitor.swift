@@ -135,10 +135,8 @@ class CPUMonitor {
         }
     }
 
-    private var timer: Timer?
     private var previousInfo: processor_info_array_t?
     private var previousCount: mach_msg_type_number_t = 0
-    private var currentInterval: TimeInterval = 2.0
     
     init() {
         var size = 0
@@ -177,28 +175,11 @@ class CPUMonitor {
         return Int(value)
     }
     
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        // Scheduled on the main run loop, so the callback is already on the main actor. The
-        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
-        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
+    isolated deinit {
+        if let previousInfo {
+            vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: previousInfo)),
+                          vm_size_t(MemoryLayout<integer_t>.stride * Int(previousCount)))
         }
-        timer?.tolerance = currentInterval * 0.1
-        update()
-    }
-    
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-        // Deliberately keeps `previousInfo` — clearing it here (as this used to) means every
-        // restart's first tick has no baseline to diff against, so `update()` produces no data
-        // at all: 0% usage, an empty core list, until the *second* tick. Invisible when the
-        // monitor only ever started once at launch, but glaring now that pausing/resuming with
-        // the dashboard panel restarts it constantly — every reopened tab flashed blank. Every
-        // other monitor already gets this right; the stale-but-present baseline just means the
-        // first post-resume reading averages over the paused interval, same as they do.
     }
     
     /// Ticks elapsed between two samples of one CPU-state counter. The kernel keeps these as
@@ -212,7 +193,7 @@ class CPUMonitor {
     /// a 1 Hz timer from piling up references for the life of the app.
     private static let host = mach_host_self()
 
-    private func update() {
+    func update() {
         let host = Self.host
         var processorCount: UInt32 = 0
         var processorInfo: processor_info_array_t?

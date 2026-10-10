@@ -15,40 +15,12 @@ class DiskMonitor {
     var readHistory: [Double] = Array(repeating: 0, count: 60)
     var writeHistory: [Double] = Array(repeating: 0, count: 60)
 
-    private var timer: Timer?
     private var lastReadBytes: Int64 = 0
     private var lastWriteBytes: Int64 = 0
     private var lastUpdate: Date = Date()
-    private var currentInterval: TimeInterval = 1.0
-    /// The capacity query costs ~10 ms (it asks the system to total purgeable space), and free
-    /// space moves slowly — so it runs on every start and then at most this often, not per tick.
-    private static let usageRefreshInterval: TimeInterval = 30
-    private var lastUsageRefresh: Date = .distantPast
-
-    func start(interval: TimeInterval? = nil) {
-        stop()
-        if let interval { currentInterval = interval }
-        lastUsageRefresh = .distantPast
-        // Scheduled on the main run loop, so the callback is already on the main actor. The
-        // tolerance lets macOS coalesce this wakeup with the other monitors' and the system's.
-        timer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.update() }
-        }
-        timer?.tolerance = currentInterval * 0.1
-        update()
-    }
-
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func update() {
+    func update() {
         temperature = SMCHelper.diskTemperature()
-        if Date().timeIntervalSince(lastUsageRefresh) >= Self.usageRefreshInterval {
-            lastUsageRefresh = Date()
-            updateUsage()
-        }
+        updateUsage()
         updateIOStats()
     }
 

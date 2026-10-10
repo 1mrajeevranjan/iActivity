@@ -47,9 +47,11 @@ On first launch, a welcome screen offers to enable Launch at Login and, if the a
 git clone https://github.com/1mrajeevranjan/iActivity.git
 cd iActivity
 
-# Debug build + run
+# Build and run the app bundle
+./script/build_and_run.sh
+
+# Debug build
 swift build
-.build/debug/iActivity
 
 # Release build
 swift build -c release

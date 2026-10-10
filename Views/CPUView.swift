@@ -3,7 +3,7 @@ import SwiftUI
 struct CPUView: View {
     @Environment(SystemMonitor.self) private var monitor
     @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
-    @State private var showingCores = false
+    @AppStorage("showCPUCoreDetails") private var showingCores = false
 
     private var tint: Color { AppTheme.Colors.accentColor(for: .cpu) }
 
@@ -24,7 +24,7 @@ struct CPUView: View {
         VStack(spacing: AppTheme.Metrics.groupSpacing) {
             StatTileRow(tiles: [
                 .init(icon: "thermometer.medium", label: "Temp", value: temperatureUnit.reading(fromCelsius: monitor.cpu.temperature)),
-                .init(icon: "cpu", label: "Cores", value: "\(monitor.cpu.coreUsages.count)"),
+                .init(icon: "cpu", label: "Cores", value: "\(ProcessInfo.processInfo.processorCount)"),
                 .init(icon: "chart.bar", label: "Peak", value: "\(Int((monitor.cpu.history.max() ?? 0) * 100))%"),
             ], tint: tint)
 
@@ -149,8 +149,6 @@ struct CoreBar: View {
     let usage: Double
     let tint: Color
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack(spacing: 8) {
             Text(kind.label)
@@ -159,7 +157,7 @@ struct CoreBar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 58, alignment: .leading)
 
-            ProgressBar(fraction: usage, tint: tint, animated: !reduceMotion)
+            ProgressBar(fraction: usage, tint: tint)
 
             Text("\(Int(usage * 100))%")
                 .font(.caption)
