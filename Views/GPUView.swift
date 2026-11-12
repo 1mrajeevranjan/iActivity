@@ -31,12 +31,14 @@ struct GPUView: View {
                 )
             }
 
-            CardDivider()
+            if !AppSetup.isSandboxed {
+                CardDivider()
 
-            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                // macOS exposes no public per-process GPU time, so this is honest about ranking by CPU.
-                GroupLabel(text: "Top processes by CPU")
-                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                    // macOS exposes no public per-process GPU time, so this is honest about ranking by CPU.
+                    GroupLabel(text: "Top processes by CPU")
+                    TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                }
             }
 
             CardDivider()

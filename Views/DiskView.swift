@@ -46,11 +46,13 @@ struct DiskView: View {
                 )
             }
 
-            CardDivider()
+            if !AppSetup.isSandboxed {
+                CardDivider()
 
-            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Most active processes")
-                TopProcessesView(processes: monitor.processes.topByDisk, metric: .disk, tint: tint)
+                VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                    GroupLabel(text: "Most active processes")
+                    TopProcessesView(processes: monitor.processes.topByDisk, metric: .disk, tint: tint)
+                }
             }
         }
     }

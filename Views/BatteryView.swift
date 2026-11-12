@@ -55,11 +55,13 @@ struct BatteryView: View {
                 FactRow(label: "Draw", value: String(format: "%.1f W", monitor.battery.watts), icon: "bolt", tint: .yellow)
             }
 
-            CardDivider()
+            if !AppSetup.isSandboxed {
+                CardDivider()
 
-            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Top processes by CPU")
-                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                    GroupLabel(text: "Top processes by CPU")
+                    TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                }
             }
         }
     }

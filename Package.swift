@@ -14,7 +14,7 @@ let package = Package(
             name: "iActivity",
             path: ".",
             exclude: ["Tests", "docs", "videos", "brag-output", "script", "iActivity.app",
-                      "iActivity.dmg", "Info.plist", "README.md", "build_and_package.sh", "icon.png"],
+                      "iActivity.dmg", "iActivity.pkg", "packaging", "Info.plist", "README.md", "PRIVACY.md", "build_and_package.sh", "icon.png"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

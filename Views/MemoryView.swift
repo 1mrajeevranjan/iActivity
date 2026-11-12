@@ -59,11 +59,13 @@ struct MemoryView: View {
                 CompositionRow(label: "Swap", value: formatBytes(Int64(monitor.memory.swapUsed)), fraction: share(monitor.memory.swapUsed), tint: .secondary)
             }
 
-            CardDivider()
+            if !AppSetup.isSandboxed {
+                CardDivider()
 
-            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Top processes")
-                TopProcessesView(processes: monitor.processes.topByMemory, metric: .memory, tint: tint)
+                VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                    GroupLabel(text: "Top processes")
+                    TopProcessesView(processes: monitor.processes.topByMemory, metric: .memory, tint: tint)
+                }
             }
         }
     }

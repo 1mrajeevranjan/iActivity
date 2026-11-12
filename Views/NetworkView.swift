@@ -51,11 +51,13 @@ struct NetworkView: View {
                 FactRow(label: "Interface", value: monitor.network.primaryInterfaceName, icon: "network", tint: tint)
             }
 
-            CardDivider()
+            if !AppSetup.isSandboxed {
+                CardDivider()
 
-            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Top processes by CPU")
-                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                    GroupLabel(text: "Top processes by CPU")
+                    TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                }
             }
         }
     }
