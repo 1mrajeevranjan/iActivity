@@ -5,7 +5,11 @@ import ServiceManagement
 @MainActor
 class AppSetup {
     static let shared = AppSetup()
-    
+
+    /// True in the Mac App Store build. The sandbox denies reading other processes' usage and
+    /// writing to /Applications, so features that need either hide themselves instead of failing.
+    nonisolated static let isSandboxed = ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+
     // MARK: - Launch at Login
     
     var isLaunchAtLoginEnabled: Bool {
@@ -28,6 +32,7 @@ class AppSetup {
     // MARK: - Move to Applications
     
     func moveToApplicationsIfNeeded() {
+        guard !Self.isSandboxed else { return }
         let bundlePath = Bundle.main.bundlePath
         
         // Check if we're already in /Applications or /Users/shared/Applications etc.

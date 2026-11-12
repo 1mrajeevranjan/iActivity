@@ -32,6 +32,7 @@ if ! cp "$BIN_PATH/$APP_NAME" "$APP_NAME.app/Contents/MacOS/"; then
 fi
 # Symbol tables are ~60% of the binary and nothing reads them at runtime (3.5 MB → 1.4 MB).
 # Stripping drops the linker's ad-hoc signature, and Apple Silicon won't run unsigned code.
+cp Info.plist "$APP_NAME.app/Contents/Info.plist"
 strip -rSTx "$APP_NAME.app/Contents/MacOS/$APP_NAME"
 codesign --force --sign - "$APP_NAME.app"
 

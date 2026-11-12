@@ -74,11 +74,13 @@ struct CPUView: View {
                 }
             }
 
-            CardDivider()
+            if !AppSetup.isSandboxed {
+                CardDivider()
 
-            VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
-                GroupLabel(text: "Top processes")
-                TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                VStack(alignment: .leading, spacing: AppTheme.Metrics.rowSpacing) {
+                    GroupLabel(text: "Top processes")
+                    TopProcessesView(processes: monitor.processes.topByCPU, metric: .cpu, tint: tint)
+                }
             }
 
             CardDivider()
