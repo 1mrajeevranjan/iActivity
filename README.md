@@ -39,29 +39,26 @@ On first launch, a welcome screen offers to enable Launch at Login and, if the a
 ## Requirements
 
 - macOS 26 (Tahoe) or later
-- Swift 6.2+ / Xcode with a matching SDK, to build from source
+- Xcode 26+ to build from source
 
 ## Building from source
+
+Open `iActivity.xcodeproj` in Xcode and press ⌘R. Xcode's Run builds the sandboxed App Store
+configuration, signed with your team.
 
 ```bash
 git clone https://github.com/1mrajeevranjan/iActivity.git
 cd iActivity
 
-# Build and run the app bundle
+# Build (unsandboxed, ad-hoc signed) and run ./iActivity.app
 ./script/build_and_run.sh
-
-# Debug build
-swift build
-
-# Release build
-swift build -c release
 ```
 
-To package as a distributable `.app` / `.dmg`, run:
+### Distributing
 
-```bash
-./build_and_package.sh
-```
+- **Mac App Store:** in Xcode, Product ▸ Archive, then Distribute App ▸ App Store Connect.
+  Version and build number live in the target's General tab; bump the build for every upload.
+- **Direct download:** `./build_and_package.sh` builds a universal `iActivity.dmg`.
 
 ## Testing
 
@@ -71,10 +68,14 @@ Unit tests cover panel-anchoring geometry, temperature conversion, and the setti
 swift test
 ```
 
+`Package.swift` compiles the same sources only so the tests run without Xcode; the app is built
+from `iActivity.xcodeproj`.
+
 ## Project structure
 
 ```
 iActivity/
+├── iActivity.xcodeproj       # App target, signing, entitlements, distribution
 ├── iActivityApp.swift       # App entry point, menu bar item, right-click menu, Settings window
 ├── Monitors/                 # One file per data source (CPU, GPU, Memory, Disk, Battery, Network,
 │                              #   Process list) plus SystemMonitor (orchestrator) and PanelManager
@@ -83,6 +84,8 @@ iActivity/
 │   └── Components/           #   plus shared card/chart/tile components
 ├── Theme/                    # Design tokens (spacing, radius, colors, panel geometry)
 ├── Utilities/                # AppSetup (launch at login, Dock visibility, first-run install)
+├── Resources/                # App icon
+├── packaging/                # Entitlements and privacy manifest used by the Xcode target
 └── Tests/iActivityTests/     # Swift Testing unit tests
 ```
 
