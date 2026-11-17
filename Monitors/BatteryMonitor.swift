@@ -14,8 +14,7 @@ class BatteryMonitor {
     
     var watts: Double = 0
     var levelHistory: [Double] = Array(repeating: 0, count: 60)
-    var powerHistory: [Double] = Array(repeating: 0, count: 60)
-    
+
     var healthPercentage: Double = 0
     var cycleCount: Int = 0
 
@@ -62,9 +61,6 @@ class BatteryMonitor {
 
         levelHistory.removeFirst()
         levelHistory.append(Double(level) / 100.0)
-
-        powerHistory.removeFirst()
-        powerHistory.append(watts)
     }
 
     /// What the whole Mac is drawing right now, in watts.

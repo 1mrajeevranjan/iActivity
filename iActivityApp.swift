@@ -142,14 +142,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 titleLabel.frame.origin = NSPoint(x: windowCenterInAccessorySpace - titleLabel.frame.width / 2, y: 3)
             }
 
-            // SwiftUI's `.onExitCommand` never fired inside the Form — it appears to consume Esc
-            // itself before the exit-command handler sees it. A local monitor on the window
-            // reliably closes it on Esc regardless of what SwiftUI does with the key event.
-            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak window] event in
-                guard let window, window.isKeyWindow, event.keyCode == 53 else { return event }
-                window.close()
-                return nil
-            }
+            closeOnEscape(window)
 
             settingsWindow = window
         }
@@ -176,11 +169,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.contentView = NSHostingView(rootView: contentView)
             window.backgroundColor = .clear
             window.isMovableByWindowBackground = true
+            closeOnEscape(window)
             onboardingWindow = window
         }
-        
+
         NSApp.activate(ignoringOtherApps: true)
         onboardingWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    /// SwiftUI's `.onExitCommand` never fires in these windows — the Settings Form consumes Esc
+    /// itself, and nothing in Onboarding holds focus to receive it. A local monitor closes the
+    /// window on Esc regardless of what SwiftUI does with the key event.
+    private func closeOnEscape(_ window: NSWindow) {
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak window] event in
+            guard let window, window.isKeyWindow, event.keyCode == 53 else { return event }
+            window.close()
+            return nil
+        }
     }
 
     /// Keeps the status item exactly as wide as its hosted content.
@@ -216,7 +221,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func buildStatusMenu() -> NSMenu {
+    func buildStatusMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -226,12 +231,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(iconMenuItem("Settings…", symbol: nil, action: #selector(openSettings), keyEquivalent: ","))
 
         let moreItem = NSMenuItem(title: "More", action: nil, keyEquivalent: "")
-        moreItem.attributedTitle = styledMenuTitle("More", symbol: "ellipsis.circle", enabled: true)
+        moreItem.attributedTitle = styledMenuTitle("More", symbol: "ellipsis.circle")
         moreItem.submenu = buildMoreMenu()
         menu.addItem(moreItem)
 
         menu.addItem(.separator())
-        menu.addItem(iconMenuItem("Quit iActivity", symbol: nil, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let quitItem = iconMenuItem("Quit iActivity", symbol: nil, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        // `terminate:` lives on NSApplication. Left aimed at this delegate, the click was sent to
+        // an object that cannot handle it and Quit silently did nothing.
+        quitItem.target = NSApp
+        menu.addItem(quitItem)
 
         return menu
     }
@@ -251,9 +260,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        // ponytail: no Mac App Store listing yet (DMG-only per README) — item stays disabled
-        // until a real store link exists. Wire `openRateApp` up once there's a URL/ID to open.
-        menu.addItem(iconMenuItem("Rate App", symbol: "star", action: nil))
+        menu.addItem(iconMenuItem("Rate App", symbol: "star", action: #selector(openRateApp)))
         menu.addItem(iconMenuItem("Share App", symbol: "square.and.arrow.up", action: #selector(shareApp)))
         menu.addItem(iconMenuItem("More Apps by Me", symbol: "square.stack.3d.up", action: #selector(openMoreApps)))
 
@@ -264,15 +271,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// only reliably renders when it rides inside the *title* as a text attachment, since the
     /// menu always draws titles. Every item in this menu goes through here for that reason.
     /// `symbol: nil` renders a plain title — used for the two rows macOS already decorates itself.
-    private func iconMenuItem(_ title: String, symbol: String?, action: Selector?, keyEquivalent: String = "") -> NSMenuItem {
+    private func iconMenuItem(_ title: String, symbol: String?, action: Selector, keyEquivalent: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
         item.target = self
-        item.isEnabled = action != nil
-        item.attributedTitle = styledMenuTitle(title, symbol: symbol, enabled: item.isEnabled)
+        item.attributedTitle = styledMenuTitle(title, symbol: symbol)
         return item
     }
 
-    private func styledMenuTitle(_ title: String, symbol: String?, enabled: Bool) -> NSAttributedString {
+    private func styledMenuTitle(_ title: String, symbol: String?) -> NSAttributedString {
         let line = NSMutableAttributedString()
         if let symbol, let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)) {
@@ -282,10 +288,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             line.append(NSAttributedString(attachment: attachment))
             line.append(NSAttributedString(string: "  "))
         }
-        // An attributed title opts out of automatic disabled-row greying (§ 15) — apply it by
-        // hand so the still-inert "Rate App" row doesn't read as a live, clickable item.
-        let textColor: NSColor = enabled ? .labelColor : .disabledControlTextColor
-        line.append(NSAttributedString(string: title, attributes: [.font: NSFont.menuFont(ofSize: 13), .foregroundColor: textColor]))
+        line.append(NSAttributedString(string: title, attributes: [.font: NSFont.menuFont(ofSize: 13), .foregroundColor: NSColor.labelColor]))
         return line
     }
 
@@ -293,7 +296,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         showSettings()
     }
 
+    // A status item's menu never activates the app, and an inactive app's windows open behind
+    // whatever is frontmost — activate first, as `showSettings()` does.
     @objc private func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(nil)
     }
 
@@ -304,22 +310,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ← / → — switch between tabs
         ⌘1–⌘6 — jump straight to a tab
         Esc — close the dashboard
-        Space, outside the panel — also closes it
+        Clicking outside the panel also closes it
         """
         alert.alertStyle = .informational
+        NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
 
     @objc private func openSupport() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity/issues/new")!)
+        NSWorkspace.shared.open(URL(string: "https://www.mishorastudio.com/contact")!)
     }
 
     @objc private func openFAQ() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity#readme")!)
+        NSWorkspace.shared.open(URL(string: "https://www.mishorastudio.com/apps/iactivity#faq")!)
     }
 
     @objc private func openWebsite() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan/iActivity")!)
+        NSWorkspace.shared.open(URL(string: "https://www.mishorastudio.com/apps/iactivity")!)
+    }
+
+    @objc private func openRateApp() {
+        NSWorkspace.shared.open(URL(string: "https://www.mishorastudio.com/apps/iactivity")!)
     }
 
     @objc private func shareApp() {
@@ -329,9 +340,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openMoreApps() {
-        // ponytail: no App Store developer page yet — points at the GitHub profile instead.
-        // Swap for the real "see all developer apps" link once one exists.
-        NSWorkspace.shared.open(URL(string: "https://github.com/1mrajeevranjan")!)
+        NSWorkspace.shared.open(URL(string: "https://www.mishorastudio.com/apps")!)
     }
 }
 

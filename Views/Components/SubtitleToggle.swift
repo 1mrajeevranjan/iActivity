@@ -19,9 +19,15 @@ struct SubtitleToggle: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // The switch carries the words instead, so VoiceOver reads them once, on the control.
+            .accessibilityHidden(true)
             Spacer(minLength: 12)
-            Toggle("", isOn: $isOn)
+            Toggle(title, isOn: $isOn)
                 .labelsHidden()
+                .accessibilityHint(Text(subtitle ?? ""))
+                // An accessibility press reported success but never flipped this switch, so
+                // VoiceOver could not change any of these settings. Flip it explicitly.
+                .accessibilityAction { isOn.toggle() }
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 // NSSwitch mid-animation state changes strand the knob visually wrong (renders
@@ -29,6 +35,5 @@ struct SubtitleToggle: View {
                 // redraws outright instead of interrupting an in-flight transition.
                 .animation(nil, value: isOn)
         }
-        .accessibilityElement(children: .combine)
     }
 }

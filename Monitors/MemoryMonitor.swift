@@ -6,9 +6,6 @@ import Observation
 class MemoryMonitor {
     var total: Double = 0
     var used: Double = 0
-    var free: Double = 0
-    var active: Double = 0
-    var inactive: Double = 0
     var wired: Double = 0
     var compressed: Double = 0
     var appMemory: Double = 0
@@ -70,11 +67,8 @@ class MemoryMonitor {
         guard result == KERN_SUCCESS else { return }
 
         let pageSize = Double(getpagesize())
-        self.active = Double(stats.active_count) * pageSize
-        self.inactive = Double(stats.inactive_count) * pageSize
         self.wired = Double(stats.wire_count) * pageSize
         self.compressed = Double(stats.compressor_page_count) * pageSize
-        self.free = Double(stats.free_count) * pageSize
         // Activity Monitor's breakdown: App Memory is anonymous memory that can't simply be
         // dropped, Cached Files is file-backed or purgeable memory the system reclaims on demand.
         // "Memory Used" is App + Wired + Compressed — counting all of `active` (as this used to)

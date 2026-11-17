@@ -16,11 +16,6 @@ struct MetricRow: View {
     var history: [Double]? = nil
     /// Fixed sparkline scale, for percentages.
     var domain: ClosedRange<Double>? = nil
-    /// Spoken form when `label` is abbreviated.
-    var spokenLabel: String? = nil
-    /// Optional second series for the sparkline, drawn on the same scale as `history`.
-    var secondaryHistory: [Double]? = nil
-    var secondaryTint: Color = AppTheme.Colors.brandBlue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -55,17 +50,11 @@ struct MetricRow: View {
             }
 
             if let history, history.count > 1 {
-                Sparkline(
-                    data: history,
-                    tint: tint,
-                    domain: domain,
-                    secondary: secondaryHistory,
-                    secondaryTint: secondaryTint
-                )
+                Sparkline(data: history, tint: tint, domain: domain)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(spokenLabel ?? label))
+        .accessibilityLabel(Text(label))
         .accessibilityValue(Text(value))
     }
 }

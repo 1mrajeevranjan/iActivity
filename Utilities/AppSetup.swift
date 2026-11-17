@@ -1,10 +1,12 @@
 import Foundation
 import AppKit
 import ServiceManagement
+import OSLog
 
 @MainActor
 class AppSetup {
     static let shared = AppSetup()
+    private static let log = Logger(subsystem: "com.rajeev.iActivity", category: "AppSetup")
 
     /// True in the Mac App Store build. The sandbox denies reading other processes' usage and
     /// writing to /Applications, so features that need either hide themselves instead of failing.
@@ -24,7 +26,7 @@ class AppSetup {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                print("Failed to update launch at login status: \(error)")
+                Self.log.error("Failed to update launch at login: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -44,12 +46,13 @@ class AppSetup {
         alert.messageText = "Move to Applications?"
         alert.informativeText = "iActivity works best when installed in your Applications folder. This will also make it appear in Launchpad."
         alert.addButton(withTitle: "Move to Applications")
-        alert.addButton(withTitle: "Stay in Downloads")
+        alert.addButton(withTitle: "Not Now")
         // NSAlert only auto-binds Esc to a button titled exactly "Cancel" — neither button
         // here qualifies, so Esc silently did nothing. Bind it explicitly to the safe,
         // non-destructive choice.
         alert.buttons[1].keyEquivalent = "\u{1b}"
 
+        NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn {
             let fileManager = FileManager.default
             let targetURL = URL(fileURLWithPath: "/Applications").appendingPathComponent(URL(fileURLWithPath: bundlePath).lastPathComponent)

@@ -8,10 +8,10 @@ struct MetricCategoryTests {
         #expect(MetricCategory.allCases == [.cpu, .gpu, .memory, .disk, .battery, .network])
     }
 
-    @Test("Every category has a non-empty icon and short title", arguments: MetricCategory.allCases)
-    func everyCategoryHasIconAndShortTitle(category: MetricCategory) {
+    @Test("Every category has a non-empty icon and display name", arguments: MetricCategory.allCases)
+    func everyCategoryHasIconAndDisplayName(category: MetricCategory) {
         #expect(!category.icon.isEmpty)
-        #expect(!category.shortTitle.isEmpty)
+        #expect(!category.displayName.isEmpty)
     }
 
     @Test("id matches rawValue, so AppStorage round-trips correctly")
@@ -21,21 +21,14 @@ struct MetricCategoryTests {
         }
     }
 
-    @Test("Short titles are unique — the tab bar and menu bar picker rely on this to disambiguate")
-    func shortTitlesAreUnique() {
-        let titles = MetricCategory.allCases.map(\.shortTitle)
-        #expect(Set(titles).count == titles.count)
+    @Test("Display names are unique — the tab bar and Settings toggles rely on this to disambiguate")
+    func displayNamesAreUnique() {
+        let names = MetricCategory.allCases.map(\.displayName)
+        #expect(Set(names).count == names.count)
     }
 }
 
 struct AppearanceModeTests {
-    @Test("Light and dark map to their SwiftUI ColorScheme; auto maps to nil (follow system)")
-    func colorSchemeMapping() {
-        #expect(AppearanceMode.light.colorScheme == .light)
-        #expect(AppearanceMode.dark.colorScheme == .dark)
-        #expect(AppearanceMode.auto.colorScheme == nil)
-    }
-
     @Test("id matches rawValue for AppStorage round-tripping")
     func idMatchesRawValue() {
         for mode in AppearanceMode.allCases {

@@ -19,16 +19,13 @@ struct Sparkline: View {
     var secondary: [Double]? = nil
     var secondaryTint: Color = AppTheme.Colors.brandBlue
 
-    /// Overrides the stored style. The menu bar passes its own *geometry*, not its own style —
-    /// picking "Area" is expected to change both surfaces at once.
-    var styleOverride: ChartStyle? = nil
+    /// The menu bar passes its own *geometry*, never its own style — picking "Area" is expected
+    /// to change both surfaces at once.
     var height: CGFloat = AppTheme.Metrics.sparklineHeight
     var lineWidth: CGFloat = 1.5
 
-    @AppStorage("chartStyle") private var storedStyle: ChartStyle = .line
+    @AppStorage("chartStyle") private var style: ChartStyle = .line
     @Environment(\.colorSchemeContrast) private var contrast
-
-    private var style: ChartStyle { styleOverride ?? storedStyle }
 
     /// Bounds span BOTH series, so a pair is read against one scale. Scaling each independently
     /// would draw an idle efficiency cluster as busy as a pinned performance one.
