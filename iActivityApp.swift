@@ -223,9 +223,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        // Settings/Quit carry no custom symbol — macOS decorates rows using these two exact
-        // actions with its own icon, and adding one doubles it (design-system § 15's Settings
-        // note, same behaviour holds for Quit here).
+        // Settings carries no custom symbol — macOS decorates a row using this exact action with
+        // its own gear, and adding one doubles it (design-system § 15). Quit gets no such
+        // decoration, so it supplies its own.
         menu.addItem(iconMenuItem("Settings…", symbol: nil, action: #selector(openSettings), keyEquivalent: ","))
 
         let moreItem = NSMenuItem(title: "More", action: nil, keyEquivalent: "")
@@ -234,7 +234,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(moreItem)
 
         menu.addItem(.separator())
-        let quitItem = iconMenuItem("Quit iActivity", symbol: nil, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quitItem = iconMenuItem("Quit iActivity", symbol: "power", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         // `terminate:` lives on NSApplication. Left aimed at this delegate, the click was sent to
         // an object that cannot handle it and Quit silently did nothing.
         quitItem.target = NSApp
