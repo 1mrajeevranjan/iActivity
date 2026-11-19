@@ -33,12 +33,14 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        // No outer padding: macOS already adds 8pt either side of a fixed-length status item —
+        // the same margin a native image item gets — so any padding here makes ours look loose.
+        // Segments sit 16pt apart, the glyph-to-glyph gap between two separate system items.
+        HStack(spacing: 16) {
             ForEach(categories) { category in
                 segment(for: category)
             }
         }
-        .padding(.horizontal, 4)
         .fixedSize()
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in onWidthChange() }
         // System design, not rounded, with monospaced digits so the strip does not jitter as
