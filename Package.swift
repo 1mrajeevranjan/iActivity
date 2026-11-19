@@ -1,6 +1,8 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
+// The app itself is built, signed and distributed from iActivity.xcodeproj. This package compiles
+// the same sources so `swift test` runs the test suite without Xcode.
 let package = Package(
     name: "iActivity",
     platforms: [
@@ -13,16 +15,9 @@ let package = Package(
         .executableTarget(
             name: "iActivity",
             path: ".",
-            exclude: ["Tests", "docs", "videos", "brag-output", "script", "iActivity.app",
-                      "iActivity.dmg", "iActivity.pkg", "packaging", "Info.plist", "README.md", "PRIVACY.md", "build_and_package.sh", "icon.png"],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-Xlinker", "-sectcreate",
-                    "-Xlinker", "__TEXT",
-                    "-Xlinker", "__info_plist",
-                    "-Xlinker", "Info.plist"
-                ])
-            ]
+            exclude: ["Tests", "docs", "videos", "script", "iActivity.app", "iActivity.xcodeproj",
+                      "iActivity.dmg", "build", "packaging", "Resources", "Info.plist", "README.md", "PRIVACY.md",
+                      "build_and_package.sh", "icon.png"]
         ),
         .testTarget(
             name: "iActivityTests",

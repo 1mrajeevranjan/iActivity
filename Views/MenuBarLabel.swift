@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The menu bar strip: one segment per selected category, each `[temp] [value] [chart] [icon]`.
+/// The menu bar strip: one segment per selected category, each `[temp] [chart] [badge]`, where the
+/// badge is the category's SF Symbol with the reading drawn inside it.
 ///
 /// This file used to be dead code — the menu bar was drawn in `AppDelegate.updateMenuBarDisplay()`
 /// as an `attributedTitle` plus an SF Symbol, and nothing referenced this view. It is now the live
@@ -54,15 +55,19 @@ struct MenuBarLabel: View {
                     .foregroundStyle(.primary)
             }
 
-            valueLabel(for: category)
-
             if showGraph {
                 chart(for: category)
             }
 
-            Image(systemName: iconName(for: category))
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 12, weight: .medium))
+            if let shape = MenuBarBadge.Shape(category) {
+                MenuBarBadge(shape: shape, value: "\(percentage(for: category))", status: status(for: category))
+                if category == .battery && monitor.battery.isCharging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 9, weight: .bold))
+                }
+            } else {
+                networkLabel
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(category.displayName))
@@ -71,56 +76,51 @@ struct MenuBarLabel: View {
 
     // MARK: - Readings
 
-    private func valueText(for category: MetricCategory) -> String {
+    private func percentage(for category: MetricCategory) -> Int {
         switch category {
-        case .cpu: return percent(monitor.cpu.usage)
-        case .gpu: return percent(monitor.gpu.utilization)
-        case .memory: return percent(monitor.memory.usagePercentage)
-        case .disk: return percent(monitor.disk.usagePercentage)
-        case .battery: return "\(monitor.battery.level)%"
-        case .network:
-            return "↓\(Self.compactSpeed(monitor.network.downloadSpeed)) ↑\(Self.compactSpeed(monitor.network.uploadSpeed))"
+        case .cpu: return Int(monitor.cpu.usage * 100)
+        case .gpu: return Int(monitor.gpu.utilization * 100)
+        case .memory: return Int(monitor.memory.usagePercentage * 100)
+        case .disk: return Int(monitor.disk.usagePercentage * 100)
+        case .battery: return monitor.battery.level
+        case .network: return 0 // No ceiling to be a percentage of.
         }
     }
 
-    private func percent(_ fraction: Double) -> String { "\(Int(fraction * 100))%" }
+    private func valueText(for category: MetricCategory) -> String {
+        guard category == .network else { return "\(percentage(for: category))%" }
+        return "↓\(Self.compactSpeed(monitor.network.downloadSpeed)) ↑\(Self.compactSpeed(monitor.network.uploadSpeed))"
+    }
 
-    /// Percentages reserve two digits, not three: hugging the text made every 9% ↔ 10% flip
-    /// shove the whole menu bar sideways, while reserving "100%" left a wide gap before "7%".
-    /// Two digits costs one digit of slack at most; a rare "100%" still grows the slot
-    /// (the status item resizes on `onWidthChange`). Network keeps its full fixed slot —
-    /// its text changes width nearly every tick.
-    @ViewBuilder
-    private func valueLabel(for category: MetricCategory) -> some View {
-        let text = Text(valueText(for: category)).foregroundStyle(status(for: category).color)
-        if category == .network {
-            Self.reserving(widest: "↓999.9M ↑999.9M") { text }
-        } else {
-            ZStack(alignment: .trailing) {
-                Text("00%").hidden()
-                text
+    /// Two readings never fit inside one glyph, so network stacks them beside a solid transfer
+    /// glyph: one icon-height slot rather than a single long line. Each line reserves "↓999 Mb" —
+    /// `compactSpeed` never goes wider below 10 Gb/s — so the strip does not shift as speeds tick over.
+    private var networkLabel: some View {
+        HStack(spacing: 3) {
+            // `network` has no filled variant; this is the solid glyph that matches the badges.
+            Image(systemName: "arrow.up.arrow.down.circle.fill")
+                .font(.system(size: 17))
+            ZStack(alignment: .leading) {
+                Text("↓999 Mb").hidden()
+                // Tight leading: digits have no descenders, and two 10pt lines must share 22pt.
+                VStack(alignment: .leading, spacing: -3) {
+                    Text("↓\(Self.compactSpeed(monitor.network.downloadSpeed))")
+                    Text("↑\(Self.compactSpeed(monitor.network.uploadSpeed))")
+                }
             }
+            .font(.system(size: 10, weight: .semibold).monospacedDigit())
         }
     }
 
-    /// Lays `content` out in the space `widest` would take, right-aligned (digits are monospaced),
-    /// and never truncates it.
-    private static func reserving(widest: String, @ViewBuilder content: () -> some View) -> some View {
-        Text(widest)
-            .hidden()
-            .overlay(alignment: .trailing) {
-                content()
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-    }
-
-    /// The menu bar's own compact formatter — deliberately not the dashboard's "42.1 MB/s",
-    /// which is far too wide for a strip that may be holding five categories at once.
+    /// The menu bar's own formatter, always in megabits per second — the unit ISPs quote, so a
+    /// 100 Mb plan reads ~100 at full speed. Deliberately not the dashboard's "42.1 MB/s".
+    /// One decimal below 10 ("0.0 Mb", "4.2 Mb"), whole numbers above ("42 Mb"), and gigabits
+    /// from 1000; thresholds sit at the rounding points so 999.6 Mb/s reads "1.0 Gb", not "1000 Mb".
     static func compactSpeed(_ bytesPerSecond: Double) -> String {
-        if bytesPerSecond >= 1_000_000 { return String(format: "%.1fM", bytesPerSecond / 1_000_000) }
-        if bytesPerSecond >= 1_000 { return String(format: "%.0fK", bytesPerSecond / 1_000) }
-        return String(format: "%.0fB", bytesPerSecond)
+        let megabits = bytesPerSecond * 8 / 1_000_000
+        if megabits >= 999.5 { return String(format: "%.1f Gb", megabits / 1_000) }
+        if megabits >= 9.95 { return String(format: "%.0f Mb", megabits) }
+        return String(format: "%.1f Mb", megabits)
     }
 
     private func status(for category: MetricCategory) -> MenuBarStatus {
@@ -147,18 +147,6 @@ struct MenuBarLabel: View {
         }
         guard celsius > 0 else { return nil }
         return temperatureUnit.string(fromCelsius: celsius, decimals: 0)
-    }
-
-    private func iconName(for category: MetricCategory) -> String {
-        guard category == .battery else { return category.icon }
-        if monitor.battery.isCharging { return "battery.100percent.bolt" }
-        switch monitor.battery.level {
-        case 81...: return "battery.100percent"
-        case 51...80: return "battery.75percent"
-        case 26...50: return "battery.50percent"
-        case 11...25: return "battery.25percent"
-        default: return "battery.0percent"
-        }
     }
 
     // MARK: - Charts
@@ -222,5 +210,112 @@ struct MenuBarLabel: View {
 
     private static func tail(_ values: [Double]) -> [Double] {
         Array(values.suffix(chartSamples))
+    }
+}
+
+/// A reading drawn inside a solid SF Symbol, the way macOS 26 draws battery percentage inside the
+/// battery glyph: one icon-sized item instead of a number plus an icon beside it.
+///
+/// The glyph is filled and the digits are drawn in the inverse colour — black on a white glyph in a
+/// dark menu bar, white on black in a light one — which stays legible where outlined glyphs with
+/// tinted digits did not. Every badge uses the same 12pt digits; each symbol gets its own point size
+/// so the solid bodies come out visually equal (the CPU's pins make its body smallest at any given
+/// size). Rects are measured at 17pt from the alpha mask of the glyph as SwiftUI renders it, then
+/// scaled — NSImage draws the same symbols up to 1.5pt larger, so measure through ImageRenderer if
+/// these ever change.
+struct MenuBarBadge: View {
+    struct Shape {
+        let symbol: String
+        let size: CGFloat
+        /// Detail inside the glyph (the CPU die, the display's tinted screen, the drive's grille)
+        /// painted over in the glyph's own colour so the digits sit on a solid surface.
+        let cover: CGRect?
+        /// Where the digits go, in points from the top-left of the glyph's frame.
+        let digits: CGRect
+
+        /// Nil for network: it has two readings and no symbol that holds both.
+        init?(_ category: MetricCategory) {
+            let size: CGFloat, cover: CGRect?, digits: CGRect
+            switch category {
+            case .cpu:
+                // 18pt is the largest whose layout frame (22pt) fits the 22pt status button.
+                (symbol, size) = ("cpu.fill", 18)
+                cover = CGRect(x: 5, y: 4.5, width: 10.5, height: 10.5)
+                digits = CGRect(x: 4, y: 3.5, width: 13, height: 12.5)
+            case .gpu:
+                (symbol, size) = ("display", 17)
+                cover = CGRect(x: 3.25, y: 2.75, width: 17.5, height: 11.5)
+                digits = CGRect(x: 2.5, y: 2, width: 19, height: 13)
+            case .memory:
+                (symbol, size) = ("memorychip.fill", 18)
+                cover = nil
+                digits = CGRect(x: 2.5, y: 3.5, width: 17.5, height: 10.5)
+            case .disk:
+                (symbol, size) = ("internaldrive.fill", 17.5)
+                cover = CGRect(x: 3.5, y: 7.5, width: 16.5, height: 6.5)
+                // Centred low, on the drive's wide base: the trapezoid above narrows too fast.
+                digits = CGRect(x: 4, y: 4, width: 15.5, height: 11)
+            case .battery:
+                // 18pt matches the system battery item's 31 × 15.
+                (symbol, size) = ("battery.100percent", 18)
+                cover = nil
+                digits = CGRect(x: 2.5, y: 2, width: 21, height: 10.5)
+            case .network:
+                return nil
+            }
+            let scale = CGAffineTransform(scaleX: size / 17, y: size / 17)
+            self.size = size
+            self.cover = cover?.applying(scale)
+            self.digits = digits.applying(scale)
+        }
+    }
+
+    static let digitSize: CGFloat = 12
+
+    let shape: Shape
+    let value: String
+    let status: MenuBarStatus
+
+    var body: some View {
+        // Warning and critical recolour the whole glyph, like the system's yellow low-power
+        // battery, rather than tinting digits too small to carry colour on their own.
+        let fill: Color = status == .normal ? .primary : status.color
+        let digitColor: Color = status == .normal ? Color(nsColor: .textBackgroundColor) : .black
+        let digits = shape.digits
+
+        // The menu bar's `.primary` is translucent, so painting the cover over the glyph in it
+        // would double up where they overlap. Instead the glyph and cover form an opaque mask
+        // and the colour is laid down once.
+        silhouette
+            .hidden()
+            .overlay { Rectangle().fill(fill).mask { silhouette } }
+            .overlay {
+                // Condensed bold, like the system battery's digits; compressed only when "100"
+                // would not otherwise fit (the CPU die and the drive).
+                ViewThatFits(in: .horizontal) {
+                    Text(value).font(.system(size: Self.digitSize, weight: .bold).width(.condensed))
+                    Text(value)
+                        .font(.system(size: Self.digitSize, weight: .bold).width(.compressed))
+                        .minimumScaleFactor(0.8)
+                }
+                .lineLimit(1)
+                .foregroundStyle(digitColor)
+                .frame(width: digits.width, height: 16)
+                .position(x: digits.midX, y: digits.midY)
+            }
+    }
+
+    private var silhouette: some View {
+        Image(systemName: shape.symbol)
+            .font(.system(size: shape.size))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(.black)
+            .overlay {
+                if let cover = shape.cover {
+                    RoundedRectangle(cornerRadius: 1)
+                        .frame(width: cover.width, height: cover.height)
+                        .position(x: cover.midX, y: cover.midY)
+                }
+            }
     }
 }

@@ -129,8 +129,7 @@ enum MetricCategory: String, CaseIterable, Identifiable {
     }
 
     /// Sentence-case name for anything a person reads as prose: VoiceOver, menus, Settings.
-    /// Never expose `title` or `shortTitle` to VoiceOver — it spells "MEM" and "BAT" out letter
-    /// by letter.
+    /// Never abbreviate it — VoiceOver spells "MEM" and "BAT" out letter by letter.
     var displayName: String {
         switch self {
         case .cpu: return "CPU"
@@ -139,17 +138,6 @@ enum MetricCategory: String, CaseIterable, Identifiable {
         case .disk: return "Disk"
         case .battery: return "Battery"
         case .network: return "Network"
-        }
-    }
-
-    var shortTitle: String {
-        switch self {
-        case .cpu: return "CPU"
-        case .gpu: return "GPU"
-        case .memory: return "MEM"
-        case .disk: return "DISK"
-        case .battery: return "BAT"
-        case .network: return "NET"
         }
     }
 }
@@ -185,15 +173,6 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
         case .light: return "Light"
         case .dark: return "Dark"
         case .auto: return "System"
-        }
-    }
-
-    /// nil means "follow the system appearance."
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .light: return .light
-        case .dark: return .dark
-        case .auto: return nil
         }
     }
 

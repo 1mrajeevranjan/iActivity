@@ -7,8 +7,6 @@ struct StatTile: View {
     let label: String
     let value: String
     var tint: Color = AppTheme.Colors.brandBlue
-    /// Spoken form, when the visible label had to be abbreviated to fit a narrow tile.
-    var spokenLabel: String? = nil
 
     var body: some View {
         VStack(spacing: 2) {
@@ -34,7 +32,7 @@ struct StatTile: View {
         .frame(height: AppTheme.Metrics.tileHeight)
         .tileSurface()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(spokenLabel ?? label))
+        .accessibilityLabel(Text(label))
         .accessibilityValue(Text(value))
     }
 }
@@ -46,7 +44,6 @@ struct StatTileRow: View {
         let icon: String
         let label: String
         let value: String
-        var spokenLabel: String? = nil
     }
 
     let tiles: [Tile]
@@ -55,7 +52,7 @@ struct StatTileRow: View {
     var body: some View {
         HStack(spacing: AppTheme.Spacing.small) {
             ForEach(tiles, id: \.label) { tile in
-                StatTile(icon: tile.icon, label: tile.label, value: tile.value, tint: tint, spokenLabel: tile.spokenLabel)
+                StatTile(icon: tile.icon, label: tile.label, value: tile.value, tint: tint)
             }
         }
     }

@@ -6,7 +6,6 @@ struct OnboardingView: View {
     let onFinish: () -> Void
 
     @State private var launchAtLogin = AppSetup.shared.isLaunchAtLoginEnabled
-    @State private var showInDock = UserDefaults.standard.bool(forKey: "showInDock")
 
     var body: some View {
         VStack(spacing: 28) {
@@ -45,8 +44,6 @@ struct OnboardingView: View {
             // a real button draws for free.
             Button {
                 AppSetup.shared.isLaunchAtLoginEnabled = launchAtLogin
-                UserDefaults.standard.set(showInDock, forKey: "showInDock")
-                AppSetup.shared.setDockIconVisibility(showInDock)
                 UserDefaults.standard.set(true, forKey: "hasFinishedOnboarding")
 
                 AppSetup.shared.moveToApplicationsIfNeeded()
@@ -66,7 +63,6 @@ struct OnboardingView: View {
         .padding(.top, 32)
         .frame(width: 400, height: 500)
         .background(VisualEffectView(material: .windowBackground, blendingMode: .behindWindow, cornerRadius: 16))
-        .onExitCommand { onFinish() }
     }
 }
 

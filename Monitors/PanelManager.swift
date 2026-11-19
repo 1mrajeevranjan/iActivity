@@ -20,7 +20,7 @@ final class PanelAnchor {
 }
 
 @MainActor
-class PanelManager: ObservableObject {
+class PanelManager {
     private var panel: NSPanel?
     private let monitor: SystemMonitor
     private let anchor = PanelAnchor()
@@ -83,7 +83,8 @@ class PanelManager: ObservableObject {
                 return nil
             }
 
-            if let category = Self.categoryForKey(event) {
+            let currentRaw = UserDefaults.standard.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
+            if let category = Self.category(for: event, current: MetricCategory(rawValue: currentRaw) ?? .cpu) {
                 NotificationCenter.default.post(name: .selectMetricCategory, object: category.rawValue)
                 return nil
             }
@@ -107,11 +108,10 @@ class PanelManager: ObservableObject {
     /// left alone so they still scroll the pane (HIG § 5.7). This has to be decoded by hand:
     /// SwiftUI's `.keyboardShortcut` needs the key window's command chain, which a borderless
     /// panel hosting an `NSHostingView` never gets.
-    private static func categoryForKey(_ event: NSEvent) -> MetricCategory? {
-        let currentRaw = UserDefaults.standard.string(forKey: "selectedCategory") ?? MetricCategory.cpu.rawValue
-        let current = MetricCategory(rawValue: currentRaw) ?? .cpu
-
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    static func category(for event: NSEvent, current: MetricCategory) -> MetricCategory? {
+        // Only the keys a person holds down. `deviceIndependentFlagsMask` also keeps `.function`
+        // and `.numericPad`, which macOS sets on every arrow press — so arrows never matched.
+        let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
 
         if flags == .command {
             guard let digit = Int(event.charactersIgnoringModifiers ?? "") else { return nil }
@@ -133,7 +133,6 @@ class PanelManager: ObservableObject {
         outsideClickMonitor = nil
     }
 
-    @discardableResult
     private func createPanel() -> NSPanel {
         let newPanel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: AppTheme.Panel.windowWidth, height: AppTheme.Panel.windowHeight),

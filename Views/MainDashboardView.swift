@@ -277,7 +277,7 @@ private struct CategoryTabButton: View {
         }
         .pointerOnHover()
         .help(Text(category.displayName))
-        // `shortTitle` here made VoiceOver spell out "M-E-M" and "B-A-T".
+        // The full name — an abbreviation made VoiceOver spell out "M-E-M" and "B-A-T".
         .accessibilityLabel(Text(category.displayName))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }

@@ -208,3 +208,17 @@ struct LiveCoreClusterTests {
         monitor.clusters.reduce(0) { $0 + $1.coreCount }
     }
 }
+
+struct CompactSpeedTests {
+    @Test("Always megabits, never wider than \"999 Mb\" below 1 Gb/s, so the stacked network slot stays put")
+    func readsInMegabits() {
+        #expect(MenuBarLabel.compactSpeed(0) == "0.0 Mb")
+        #expect(MenuBarLabel.compactSpeed(40_000) == "0.3 Mb")       // 40 KB/s
+        #expect(MenuBarLabel.compactSpeed(125_000) == "1.0 Mb")      // 1 MB/s is 8 Mb/s; 125 KB/s is 1
+        #expect(MenuBarLabel.compactSpeed(1_243_000) == "9.9 Mb")
+        #expect(MenuBarLabel.compactSpeed(1_243_750) == "10 Mb")     // 9.95 rounds up, so it drops the decimal
+        #expect(MenuBarLabel.compactSpeed(12_500_000) == "100 Mb")
+        #expect(MenuBarLabel.compactSpeed(124_930_000) == "999 Mb")
+        #expect(MenuBarLabel.compactSpeed(124_937_500) == "1.0 Gb")  // never "1000 Mb"
+    }
+}

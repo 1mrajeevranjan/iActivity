@@ -106,7 +106,9 @@ class SystemMonitor {
         if activeCategories.contains(.disk) { disk.update() }
         if activeCategories.contains(.battery) { battery.update() }
         if activeCategories.contains(.network) { network.update() }
-        if isPanelVisible { processes.update() }
+        // The sandbox denies reading other processes, so the full-system scan would be wasted work
+        // for lists the Mac App Store build never shows.
+        if isPanelVisible && !AppSetup.isSandboxed { processes.update() }
     }
 }
 
