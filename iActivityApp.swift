@@ -209,13 +209,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func handleStatusClick() {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
-            statusItem?.menu = buildStatusMenu()
-            statusItem?.button?.performClick(nil)
-
-            // Match BatterySense pattern: clear menu reference so it doesn't hijack left-click
-            DispatchQueue.main.async { [weak self] in
-                self?.statusItem?.menu = nil
-            }
+            // Popped up by hand rather than via `statusItem.menu`: macOS stretches an attached
+            // menu to at least the status item's width, and the strip can be several hundred
+            // points wide, which left the menu mostly blank space.
+            guard let button = statusItem?.button else { return }
+            buildStatusMenu().popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY - 4), in: button)
         } else {
             panelManager?.toggle()
         }
